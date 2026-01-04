@@ -2,6 +2,12 @@
 
 An open-source procedurally generated exploration game designed to be visually modifiable while maintaining core gameplay.
 
+## 🎮 Play Now
+
+**[Play Hitbox Online →](https://raulonastool.github.io/Hitbox_HTML/)**
+
+Works on desktop, tablet, and mobile devices!
+
 ## Vision
 
 This project is inspired by Twitch Plays Pokemon - a beautiful explorable world that can be controlled collaboratively by multiple people. The goal is to create something compelling, interesting, and fun to explore, while being completely open for visual customization.
