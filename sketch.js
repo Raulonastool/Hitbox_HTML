@@ -228,9 +228,12 @@ const VAPORWAVE_THEME = {
   },
 
   drawHUD: function(score, lives, tileInfo) {
-    const pad = TILE_SIZE * 0.3,
-      w = TILE_SIZE * 6,
-      h = TILE_SIZE * 2;
+    // Responsive sizing based on screen size
+    const pad = max(TILE_SIZE * 0.3, 10);
+    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
+    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
+    const fontSize = max(TILE_SIZE * 0.4, 12);
+    const smallFontSize = max(TILE_SIZE * 0.35, 10);
 
     /* scoreboard */
     push();
@@ -244,13 +247,13 @@ const VAPORWAVE_THEME = {
 
     fill(...this.colors.cyan);
     textAlign(LEFT, TOP);
-    textSize(TILE_SIZE * 0.4);
+    textSize(fontSize);
     text(`Score: ${score}`, pad + 10, pad + 5);
-    text(`Lives: ${lives}`, pad + 10, pad + TILE_SIZE * 0.9);
+    text(`Lives: ${lives}`, pad + 10, pad + h * 0.5);
 
     /* tile info */
     if (tileInfo) {
-      const ix = width - w - pad;
+      const ix = VIEW_PIXELS - w - pad;
       push();
       fill(...this.colors.deepPurple, 200);
       rect(ix, pad, w, h, 8);
@@ -261,16 +264,16 @@ const VAPORWAVE_THEME = {
       pop();
 
       fill(...this.colors.cyan);
-      textSize(TILE_SIZE * 0.35);
+      textSize(smallFontSize);
       text(`Tile: ${tileInfo.type}`, ix + 10, pad + 5);
-      text(`(${tileInfo.x}, ${tileInfo.y})`, ix + 10, pad + TILE_SIZE * 0.9);
+      text(`(${tileInfo.x}, ${tileInfo.y})`, ix + 10, pad + h * 0.5);
     }
 
     /* instruction */
     fill(...this.colors.pink, 200);
     textAlign(CENTER);
-    textSize(TILE_SIZE * 0.35);
-    text("Arrow keys or on-screen D-pad", width / 2, height - TILE_SIZE * 0.5);
+    textSize(smallFontSize);
+    text("Arrow keys or on-screen D-pad", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
   },
 
   drawControls: function(dpadConfig) {
@@ -299,7 +302,8 @@ const VAPORWAVE_THEME = {
 
     fill(...this.colors.cyan);
     textAlign(CENTER, CENTER);
-    textSize(s * 0.55);
+    // Scale arrow text size with D-pad size, but ensure minimum readability
+    textSize(max(s * 0.55, 16));
     text("←", cx - o, cy);
     text("→", cx + o, cy);
     text("↑", cx, cy - o);
@@ -533,32 +537,39 @@ function drawStartScreen() {
   // Draw background
   CURRENT_THEME.drawBackground();
 
+  // Responsive text sizing with minimum sizes for readability
+  const titleSize = max(VIEW_PIXELS * 0.08, 24);
+  const subtitleSize = max(VIEW_PIXELS * 0.03, 12);
+  const themeSize = max(VIEW_PIXELS * 0.04, 14);
+  const instructionSize = max(VIEW_PIXELS * 0.025, 11);
+  const startSize = max(VIEW_PIXELS * 0.035, 13);
+
   // Title
   push();
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(VIEW_PIXELS * 0.08);
+  textSize(titleSize);
   text("HITBOX", VIEW_PIXELS / 2, VIEW_PIXELS * 0.3);
 
   // Subtitle
-  textSize(VIEW_PIXELS * 0.03);
+  textSize(subtitleSize);
   fill(200);
   text("Collaborative Explorable Artwork", VIEW_PIXELS / 2, VIEW_PIXELS * 0.4);
 
   // Theme info
-  textSize(VIEW_PIXELS * 0.04);
+  textSize(themeSize);
   fill(255);
   text(`Theme: ${CURRENT_THEME.name}`, VIEW_PIXELS / 2, VIEW_PIXELS * 0.55);
 
   // Instructions
-  textSize(VIEW_PIXELS * 0.025);
+  textSize(instructionSize);
   fill(180);
   if (THEMES.length > 1) {
     text("← → to change theme", VIEW_PIXELS / 2, VIEW_PIXELS * 0.65);
   }
 
   // Start button
-  textSize(VIEW_PIXELS * 0.035);
+  textSize(startSize);
   fill(...CURRENT_THEME.colors.cyan);
   let pulse = sin(frameCount * 0.1) * 0.3 + 0.7;
   fill(...CURRENT_THEME.colors.pink, 255 * pulse);
@@ -964,16 +975,26 @@ function revealAround(x, y) {
 /*  SIZE & DPAD CALCULATION  */
 
 function calcTileSize() {
-  /* 1. square canvas that fits the shortest window edge */
-  TILE_SIZE = floor(min(windowWidth, windowHeight) / FIXED_VIEW_TILES);
+  /* 1. Make canvas fill the screen as much as possible while staying square */
+  let availableWidth = windowWidth;
+  let availableHeight = windowHeight;
+
+  // Use the minimum dimension to keep it square and ensure it fits
+  let maxDimension = min(availableWidth, availableHeight);
+
+  // Calculate tile size to fill the available space
+  TILE_SIZE = floor(maxDimension / FIXED_VIEW_TILES);
   VIEW_PIXELS = TILE_SIZE * FIXED_VIEW_TILES;
 
-  /* 2. D-pad geometry (guaranteed on-screen) */
-  dpad.size = constrain(VIEW_PIXELS * 0.1, DPAD_MIN_PX, TILE_SIZE * 4); // 10 % of canvas, clamped
+  /* 2. D-pad geometry - scale based on screen size */
+  // Make D-pad larger on larger screens, smaller on mobile
+  let baseDpadSize = VIEW_PIXELS * 0.12; // 12% of canvas
+  dpad.size = constrain(baseDpadSize, DPAD_MIN_PX, TILE_SIZE * 4.5);
   dpad.dist = dpad.size * 1.2; // centre → button
-  dpad.hit = dpad.size * 1.3; // generous hit radius
+  dpad.hit = dpad.size * 1.4; // generous hit radius
 
-  const margin = dpad.size * 0.6; // distance from canvas edge
-  dpad.cx = VIEW_PIXELS - margin - dpad.size / 2;
-  dpad.cy = VIEW_PIXELS - margin - dpad.size / 2;
+  /* 3. Position D-pad in bottom-right with responsive margin */
+  const margin = max(dpad.size * 0.5, TILE_SIZE * 0.8); // responsive margin
+  dpad.cx = VIEW_PIXELS - margin - dpad.dist;
+  dpad.cy = VIEW_PIXELS - margin - dpad.dist;
 }
