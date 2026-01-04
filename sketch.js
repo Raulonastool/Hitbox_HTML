@@ -327,7 +327,12 @@ const PIXEL_ART_THEME = {
     black: [0, 0, 0],
     white: [255, 255, 255],
     uiBox: [64, 64, 64],
-    shrine: [160, 120, 252]   // purple
+    shrine: [160, 120, 252],  // purple
+    // Colors used by game code for unrevealed tiles and start screen
+    deepPurple: [40, 40, 60],
+    purple: [100, 80, 140],
+    cyan: [0, 255, 255],
+    pink: [255, 100, 180]
   },
 
   drawBackground: function() {
@@ -579,7 +584,7 @@ const PIXEL_ART_THEME = {
 
     // Hearts for lives
     fill(248, 56, 0);
-    for (let i = 0; i < player.lives; i++) {
+    for (let i = 0; i < lives; i++) {
       let heartSize = max(fontSize * 0.6, 8);
       rect(pad + 10 + i * (heartSize + 4), pad + h * 0.5, heartSize, heartSize);
     }
