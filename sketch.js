@@ -595,41 +595,66 @@ function generateWorld() {
     }
   }
 
-  // Generate biomes using perlin noise
-  let noiseScale = 0.05;
+  // Generate biomes using region-based approach with noise for organic boundaries
+  // First, create large biome regions
+  let regionSize = 16; // each region is 16x16 tiles
+  let regions = [];
+  for (let ry = 0; ry < WORLD_SIZE / regionSize; ry++) {
+    regions[ry] = [];
+    for (let rx = 0; rx < WORLD_SIZE / regionSize; rx++) {
+      let r = random();
+      // Distribute regions more evenly
+      if (r < 0.40) regions[ry][rx] = BIOMES.LAVA_FIELDS; // 40%
+      else if (r < 0.65) regions[ry][rx] = BIOMES.CRYSTAL_GARDEN; // 25%
+      else if (r < 0.85) regions[ry][rx] = BIOMES.NEON_CITY; // 20%
+      else regions[ry][rx] = BIOMES.VOID; // 15%
+    }
+  }
+
+  // Now apply with noise for organic boundaries
+  let noiseScale = 0.08;
   for (let y = 0; y < WORLD_SIZE; y++) {
     for (let x = 0; x < WORLD_SIZE; x++) {
+      let rx = floor(x / regionSize);
+      let ry = floor(y / regionSize);
+      let baseBiome = regions[ry][rx];
+
+      // Use noise to create fuzzy boundaries between regions
       let n = noise(x * noiseScale, y * noiseScale);
 
-      // Increased lava fields to 35%
-      if (n < 0.35) biomes[y][x] = BIOMES.LAVA_FIELDS;
-      else if (n < 0.6) biomes[y][x] = BIOMES.NEON_CITY;
-      else if (n < 0.85) biomes[y][x] = BIOMES.CRYSTAL_GARDEN;
-      else biomes[y][x] = BIOMES.VOID;
+      // Occasionally let noise override to create natural variation
+      if (n > 0.8) {
+        // Check neighboring region
+        let nrx = constrain(rx + (x % regionSize > regionSize/2 ? 1 : -1), 0, floor(WORLD_SIZE/regionSize) - 1);
+        let nry = constrain(ry + (y % regionSize > regionSize/2 ? 1 : -1), 0, floor(WORLD_SIZE/regionSize) - 1);
+        biomes[y][x] = regions[nry][nrx];
+      } else {
+        biomes[y][x] = baseBiome;
+      }
     }
   }
 
   // Create safe starting zone
   createSafeZone(startX, startY, 8);
 
-  // Generate rooms (interesting structures)
-  for (let i = 0; i < 20; i++) {
+  // Generate rooms (interesting structures) - reduced to preserve more biome tiles
+  for (let i = 0; i < 12; i++) {
     let rx = floor(random(10, WORLD_SIZE - 10));
     let ry = floor(random(10, WORLD_SIZE - 10));
-    let rw = floor(random(4, 10));
-    let rh = floor(random(4, 10));
+    let rw = floor(random(4, 8));
+    let rh = floor(random(4, 8));
     createRoom(rx, ry, rw, rh);
   }
 
   // Generate treasure rooms
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 6; i++) {
     let tx = floor(random(10, WORLD_SIZE - 10));
     let ty = floor(random(10, WORLD_SIZE - 10));
     createTreasureRoom(tx, ty);
   }
 
-  // Generate paths
-  for (let i = 0; i < 15; i++) {
+  // Generate paths - reduced to preserve more natural biome distribution
+  for (let i = 0; i < 10; i++) {
     let x1 = floor(random(WORLD_SIZE));
     let y1 = floor(random(WORLD_SIZE));
     let x2 = floor(random(WORLD_SIZE));
