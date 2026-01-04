@@ -312,10 +312,338 @@ const VAPORWAVE_THEME = {
   }
 };
 
+const PIXEL_ART_THEME = {
+  name: "Pixel Art Retro",
+
+  colors: {
+    sky: [92, 148, 252],      // NES blue sky
+    ground: [188, 148, 92],   // brown ground
+    grass: [0, 168, 0],       // NES green
+    lava: [248, 56, 0],       // bright red-orange
+    coin: [252, 188, 0],      // golden yellow
+    wall: [80, 80, 80],       // dark gray
+    player: [252, 216, 168],  // skin tone
+    playerOutline: [228, 92, 16], // orange outline
+    black: [0, 0, 0],
+    white: [255, 255, 255],
+    uiBox: [64, 64, 64],
+    shrine: [160, 120, 252]   // purple
+  },
+
+  drawBackground: function() {
+    // Simple sky gradient - pixel art style
+    noStroke();
+    for (let y = 0; y < VIEW_PIXELS; y += 2) {
+      let inter = map(y, 0, VIEW_PIXELS, 0, 1);
+      let skyColor = lerpColor(
+        color(92, 200, 252),
+        color(40, 120, 200),
+        inter
+      );
+      fill(skyColor);
+      rect(0, y, VIEW_PIXELS, 2);
+    }
+
+    // Pixel clouds
+    randomSeed(100);
+    fill(255, 255, 255, 180);
+    for (let i = 0; i < 15; i++) {
+      let x = random(VIEW_PIXELS);
+      let y = random(VIEW_PIXELS * 0.6);
+      let cloudSize = floor(random(2, 5));
+
+      // Draw blocky cloud
+      for (let cy = 0; cy < cloudSize; cy++) {
+        for (let cx = 0; cx < cloudSize * 2; cx++) {
+          let pixelSize = max(TILE_SIZE * 0.15, 3);
+          rect(x + cx * pixelSize, y + cy * pixelSize, pixelSize, pixelSize);
+        }
+      }
+    }
+
+    // Pixel stars (8-pointed)
+    randomSeed(200);
+    fill(255, 255, 255);
+    for (let i = 0; i < 30; i++) {
+      let x = random(VIEW_PIXELS);
+      let y = random(VIEW_PIXELS);
+      let twinkle = (frameCount + i * 10) % 60 < 30 ? 1 : 0;
+      if (twinkle) {
+        let pixelSize = max(TILE_SIZE * 0.1, 2);
+        rect(x, y, pixelSize, pixelSize);
+      }
+    }
+  },
+
+  drawTile: function(type, x, y, wx, wy) {
+    let tileSize = TILE_SIZE;
+    let pixelSize = max(floor(tileSize / 8), 1); // 8x8 pixel tiles
+
+    push();
+    noStroke();
+
+    switch (type) {
+      case "floor":
+        // Simple brown floor with subtle pattern
+        fill(...this.colors.ground);
+        rect(x, y, tileSize, tileSize);
+        // Pixel detail
+        if ((wx + wy) % 3 === 0) {
+          fill(...this.colors.ground.map(c => c - 20));
+          rect(x + pixelSize * 3, y + pixelSize * 3, pixelSize * 2, pixelSize * 2);
+        }
+        break;
+
+      case "grass":
+        // Green grass tile with pixel blades
+        fill(...this.colors.grass);
+        rect(x, y, tileSize, tileSize);
+        // Grass blades
+        fill(0, 200, 0);
+        for (let i = 0; i < 3; i++) {
+          rect(x + pixelSize * (2 + i * 2), y + pixelSize * 2, pixelSize, pixelSize * 4);
+        }
+        break;
+
+      case "lava":
+        // Animated lava
+        let frame = floor(frameCount / 10) % 2;
+        fill(...this.colors.lava);
+        rect(x, y, tileSize, tileSize);
+        // Lava bubbles
+        fill(252, 160, 68);
+        if (frame === 0) {
+          rect(x + pixelSize * 2, y + pixelSize * 2, pixelSize * 3, pixelSize * 3);
+        } else {
+          rect(x + pixelSize * 4, y + pixelSize * 4, pixelSize * 2, pixelSize * 2);
+        }
+        break;
+
+      case "coin":
+        // Spinning coin animation
+        let coinFrame = floor(frameCount / 8) % 4;
+        fill(...this.colors.coin);
+
+        if (coinFrame === 0 || coinFrame === 2) {
+          // Full coin
+          rect(x + pixelSize * 2, y + pixelSize * 1, pixelSize * 4, pixelSize * 6);
+          fill(...this.colors.black);
+          rect(x + pixelSize * 3, y + pixelSize * 2, pixelSize * 2, pixelSize * 4);
+        } else if (coinFrame === 1) {
+          // Medium coin
+          rect(x + pixelSize * 3, y + pixelSize * 1, pixelSize * 2, pixelSize * 6);
+        } else {
+          // Thin coin
+          rect(x + pixelSize * 3, y + pixelSize * 1, pixelSize * 1, pixelSize * 6);
+        }
+        break;
+
+      case "wall":
+        // Brick wall
+        fill(...this.colors.wall);
+        rect(x, y, tileSize, tileSize);
+        // Brick pattern
+        stroke(...this.colors.black);
+        strokeWeight(1);
+        line(x, y + tileSize/2, x + tileSize, y + tileSize/2);
+        line(x + tileSize/2, y, x + tileSize/2, y + tileSize/2);
+        line(x + tileSize/2, y + tileSize/2, x + tileSize/2, y + tileSize);
+        noStroke();
+        break;
+
+      case "shrine":
+        // Crystal shrine
+        let shrineFrame = floor(frameCount / 15) % 4;
+        fill(...this.colors.shrine);
+        // Diamond shape
+        let cx = x + tileSize/2;
+        let cy = y + tileSize/2;
+        let s = pixelSize * 2;
+        quad(cx, cy - s*2, cx + s*2, cy, cx, cy + s*2, cx - s*2, cy);
+        // Glow
+        if (shrineFrame < 2) {
+          fill(255, 255, 255, 150);
+          quad(cx, cy - s, cx + s, cy, cx, cy + s, cx - s, cy);
+        }
+        break;
+
+      case "explosion":
+        let timer = explosionTimers[wy][wx];
+
+        if (timer <= 10) {
+          // Exploding - big blast
+          fill(252, 216, 168);
+          rect(x, y, tileSize, tileSize);
+          fill(248, 56, 0);
+          rect(x + pixelSize * 2, y + pixelSize * 2, pixelSize * 4, pixelSize * 4);
+        } else if (timer < 30) {
+          // Warning - blinking red
+          let blink = floor(timer / 5) % 2;
+          if (blink) {
+            fill(248, 0, 0);
+          } else {
+            fill(168, 0, 0);
+          }
+          rect(x, y, tileSize, tileSize);
+          // Warning symbol
+          fill(255, 255, 0);
+          rect(x + pixelSize * 3, y + pixelSize * 1, pixelSize * 2, pixelSize * 2);
+          rect(x + pixelSize * 3, y + pixelSize * 4, pixelSize * 2, pixelSize * 3);
+        } else {
+          // Safe - yellow caution
+          fill(252, 188, 0);
+          rect(x, y, tileSize, tileSize);
+          fill(0, 0, 0);
+          rect(x + pixelSize * 3, y + pixelSize * 1, pixelSize * 2, pixelSize * 2);
+          rect(x + pixelSize * 3, y + pixelSize * 4, pixelSize * 2, pixelSize * 3);
+        }
+        break;
+
+      case "moving_hazard":
+        // Fireball enemy
+        let enemyFrame = floor(frameCount / 10) % 2;
+        fill(248, 56, 0);
+        rect(x + pixelSize * 1, y + pixelSize * 1, pixelSize * 6, pixelSize * 6);
+        fill(252, 160, 68);
+        if (enemyFrame === 0) {
+          rect(x + pixelSize * 2, y + pixelSize * 2, pixelSize * 4, pixelSize * 4);
+        } else {
+          rect(x + pixelSize * 3, y + pixelSize * 3, pixelSize * 2, pixelSize * 2);
+        }
+        // Eyes
+        fill(0, 0, 0);
+        rect(x + pixelSize * 2, y + pixelSize * 2, pixelSize, pixelSize);
+        rect(x + pixelSize * 5, y + pixelSize * 2, pixelSize, pixelSize);
+        break;
+    }
+    pop();
+  },
+
+  drawPlayer: function(x, y, hurt) {
+    let pixelSize = max(floor(TILE_SIZE / 8), 1);
+
+    push();
+    noStroke();
+
+    // Player is a simple character sprite
+    if (hurt) {
+      fill(248, 56, 0); // Red when hurt
+    } else {
+      fill(...this.colors.playerOutline);
+    }
+
+    // Body (8x8 pixel character)
+    rect(x - pixelSize * 3, y - pixelSize * 3, pixelSize * 6, pixelSize * 6);
+
+    // Head/face color
+    if (!hurt) {
+      fill(...this.colors.player);
+      rect(x - pixelSize * 2, y - pixelSize * 2, pixelSize * 4, pixelSize * 4);
+    }
+
+    // Eyes
+    fill(...this.colors.black);
+    rect(x - pixelSize * 1, y - pixelSize * 1, pixelSize, pixelSize);
+    rect(x + pixelSize * 0, y - pixelSize * 1, pixelSize, pixelSize);
+
+    pop();
+  },
+
+  drawHoverHighlight: function(tx, ty) {
+    push();
+    noFill();
+    stroke(255, 255, 0);
+    strokeWeight(2);
+    rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    pop();
+  },
+
+  drawHUD: function(score, lives, tileInfo) {
+    const pad = max(TILE_SIZE * 0.3, 10);
+    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
+    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
+    const fontSize = max(TILE_SIZE * 0.4, 12);
+    const smallFontSize = max(TILE_SIZE * 0.35, 10);
+
+    push();
+    // Retro box style
+    fill(...this.colors.uiBox);
+    rect(pad, pad, w, h);
+    fill(...this.colors.black);
+    rect(pad + 2, pad + 2, w - 4, h - 4);
+
+    fill(...this.colors.coin);
+    textAlign(LEFT, TOP);
+    textSize(fontSize);
+    text(`${score}`, pad + 10, pad + 5);
+
+    // Hearts for lives
+    fill(248, 56, 0);
+    for (let i = 0; i < player.lives; i++) {
+      let heartSize = max(fontSize * 0.6, 8);
+      rect(pad + 10 + i * (heartSize + 4), pad + h * 0.5, heartSize, heartSize);
+    }
+
+    // Tile info
+    if (tileInfo) {
+      const ix = VIEW_PIXELS - w - pad;
+      fill(...this.colors.uiBox);
+      rect(ix, pad, w, h);
+      fill(...this.colors.black);
+      rect(ix + 2, pad + 2, w - 4, h - 4);
+
+      fill(...this.colors.white);
+      textSize(smallFontSize);
+      text(`${tileInfo.type}`, ix + 10, pad + 5);
+      text(`${tileInfo.x},${tileInfo.y}`, ix + 10, pad + h * 0.5);
+    }
+
+    // Instructions
+    fill(...this.colors.white);
+    textAlign(CENTER);
+    textSize(smallFontSize);
+    text("ARROW KEYS / D-PAD", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
+    pop();
+  },
+
+  drawControls: function(dpadConfig) {
+    const s = dpadConfig.size,
+      o = dpadConfig.dist,
+      cx = dpadConfig.cx,
+      cy = dpadConfig.cy;
+
+    push();
+    // Retro D-pad design
+    fill(80, 80, 80);
+
+    // Cross shape
+    rect(cx - s/2, cy - o, s, o * 2);
+    rect(cx - o, cy - s/2, o * 2, s);
+
+    // Buttons
+    fill(60, 60, 60);
+    rect(cx - o - s/2, cy - s/2, s, s); // Left
+    rect(cx + o - s/2, cy - s/2, s, s); // Right
+    rect(cx - s/2, cy - o - s/2, s, s); // Up
+    rect(cx - s/2, cy + o - s/2, s, s); // Down
+
+    // Arrows
+    fill(200, 200, 200);
+    textAlign(CENTER, CENTER);
+    textSize(max(s * 0.55, 16));
+    text("←", cx - o, cy);
+    text("→", cx + o, cy);
+    text("↑", cx, cy - o);
+    text("↓", cx, cy + o);
+
+    pop();
+  }
+};
+
 // Available themes array
 const THEMES = [
-  VAPORWAVE_THEME
-  // More themes can be added here
+  VAPORWAVE_THEME,
+  PIXEL_ART_THEME
 ];
 
 // Active theme - swap this to change the entire visual style!
