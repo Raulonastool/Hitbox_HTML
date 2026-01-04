@@ -305,13 +305,23 @@ const VAPORWAVE_THEME = {
   }
 };
 
+// Available themes array
+const THEMES = [
+  VAPORWAVE_THEME
+  // More themes can be added here
+];
+
 // Active theme - swap this to change the entire visual style!
-let CURRENT_THEME = VAPORWAVE_THEME;
+let CURRENT_THEME = THEMES[0];
 
 /*  GLOBAL STATE */
 let TILE_SIZE, VIEW_PIXELS; // tile size & canvas side (px)
 let canvas;
 let bgGradientOffset = 0; // for animated gradient
+
+/* game state */
+let gameState = "start"; // "start" or "playing"
+let selectedThemeIndex = 0;
 
 /* player + world */
 let player = { x: 64, y: 64, lives: 3, hurtTimer: 0 };
@@ -350,8 +360,7 @@ function setup() {
   noStroke();
   textFont("monospace");
 
-  generateWorld();
-  revealAround(player.x, player.y);
+  // World generation happens when game starts (not on setup)
 }
 
 /*  RESIZE HANDLER */
@@ -365,6 +374,11 @@ function windowResized() {
 
 function draw() {
   if (document.activeElement !== canvas.elt) canvas.elt.focus();
+
+  if (gameState === "start") {
+    drawStartScreen();
+    return;
+  }
 
   /* ─── background ─── */
   CURRENT_THEME.drawBackground();
@@ -425,10 +439,11 @@ function draw() {
   for (let obs of movingObstacles) {
     let ox = obs.x - camX;
     let oy = obs.y - camY;
+    // Draw moving obstacles if in viewport (they're always visible as active threats)
     if (ox >= 0 && ox < FIXED_VIEW_TILES && oy >= 0 && oy < FIXED_VIEW_TILES) {
-      if (revealed[obs.y][obs.x]) {
-        CURRENT_THEME.drawMovingObstacle(ox * TILE_SIZE + TILE_SIZE / 2, oy * TILE_SIZE + TILE_SIZE / 2);
-      }
+      CURRENT_THEME.drawMovingObstacle(ox * TILE_SIZE + TILE_SIZE / 2, oy * TILE_SIZE + TILE_SIZE / 2);
+      // Auto-reveal tiles around moving obstacles so player can see them
+      revealAround(obs.x, obs.y);
     }
   }
 
@@ -454,6 +469,27 @@ function draw() {
 /*  INPUT   */
 
 function keyPressed() {
+  if (gameState === "start") {
+    // Theme selection
+    if (keyCode === LEFT_ARROW) {
+      selectedThemeIndex = (selectedThemeIndex - 1 + THEMES.length) % THEMES.length;
+      CURRENT_THEME = THEMES[selectedThemeIndex];
+      return false;
+    }
+    if (keyCode === RIGHT_ARROW) {
+      selectedThemeIndex = (selectedThemeIndex + 1) % THEMES.length;
+      CURRENT_THEME = THEMES[selectedThemeIndex];
+      return false;
+    }
+    // Start game
+    if (key === ' ' || keyCode === ENTER) {
+      startGame();
+      return false;
+    }
+    return false;
+  }
+
+  // In-game controls
   let dx = 0,
     dy = 0;
   if (keyCode === LEFT_ARROW) dx = -1;
@@ -468,6 +504,12 @@ function keyPressed() {
 }
 
 function touchStarted() {
+  if (gameState === "start") {
+    // Touch anywhere to start
+    startGame();
+    return false;
+  }
+
   /* four hit-tests against the invisible circles */
   if (dist(mouseX, mouseY, dpad.cx - dpad.dist, dpad.cy) < dpad.hit)
     tryMove(-1, 0);
@@ -478,6 +520,59 @@ function touchStarted() {
   if (dist(mouseX, mouseY, dpad.cx, dpad.cy + dpad.dist) < dpad.hit)
     tryMove(0, 1);
   return false;
+}
+
+function mouseClicked() {
+  if (gameState === "start") {
+    startGame();
+    return false;
+  }
+}
+
+/*  START SCREEN  */
+
+function drawStartScreen() {
+  // Draw background
+  CURRENT_THEME.drawBackground();
+
+  // Title
+  push();
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(VIEW_PIXELS * 0.08);
+  text("HITBOX", VIEW_PIXELS / 2, VIEW_PIXELS * 0.3);
+
+  // Subtitle
+  textSize(VIEW_PIXELS * 0.03);
+  fill(200);
+  text("Collaborative Explorable Artwork", VIEW_PIXELS / 2, VIEW_PIXELS * 0.4);
+
+  // Theme info
+  textSize(VIEW_PIXELS * 0.04);
+  fill(255);
+  text(`Theme: ${CURRENT_THEME.name}`, VIEW_PIXELS / 2, VIEW_PIXELS * 0.55);
+
+  // Instructions
+  textSize(VIEW_PIXELS * 0.025);
+  fill(180);
+  if (THEMES.length > 1) {
+    text("← → to change theme", VIEW_PIXELS / 2, VIEW_PIXELS * 0.65);
+  }
+
+  // Start button
+  textSize(VIEW_PIXELS * 0.035);
+  fill(...CURRENT_THEME.colors.cyan);
+  let pulse = sin(frameCount * 0.1) * 0.3 + 0.7;
+  fill(...CURRENT_THEME.colors.pink, 255 * pulse);
+  text("Press SPACE or Click to Start", VIEW_PIXELS / 2, VIEW_PIXELS * 0.75);
+
+  pop();
+}
+
+function startGame() {
+  gameState = "playing";
+  generateWorld();
+  revealAround(player.x, player.y);
 }
 
 /*  GAME LOGIC  */
@@ -720,11 +815,22 @@ function generateWorld() {
   }
 
   // Create moving obstacles
-  for (let i = 0; i < 15; i++) {
+  let obsCreated = 0;
+  let attempts = 0;
+  while (obsCreated < 20 && attempts < 100) {
+    attempts++;
     let mx = floor(random(10, WORLD_SIZE - 10));
     let my = floor(random(10, WORLD_SIZE - 10));
-    // Avoid placing on walls or starting area
-    if (dist(mx, my, startX, startY) > 15 && world[my][mx] !== "wall") {
+    let distFromStart = dist(mx, my, startX, startY);
+
+    // Spawn some close (20%), some medium (40%), some far (40%)
+    let spawnChance = random();
+    let validDistance = (spawnChance < 0.2 && distFromStart > 10 && distFromStart < 25) || // close
+                        (spawnChance < 0.6 && distFromStart > 20 && distFromStart < 50) || // medium
+                        (distFromStart > 40); // far
+
+    // Avoid walls and immediate starting area
+    if (validDistance && distFromStart > 10 && world[my][mx] !== "wall") {
       movingObstacles.push({
         x: mx,
         y: my,
@@ -733,6 +839,7 @@ function generateWorld() {
         moveTimer: 0,
         moveSpeed: floor(random(20, 40)) // frames between moves
       });
+      obsCreated++;
     }
   }
 }
