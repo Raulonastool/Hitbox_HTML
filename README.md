@@ -36,9 +36,10 @@ The dream is for artists to create their own visual themes (pixel art characters
   - Paths: Connected corridors between areas
 
 ### Visuals & Themes
-- **Two Complete Themes**:
+- **Three Complete Themes**:
   - **Vaporwave**: Neon aesthetic with animated perspective grid, twinkling stars, CRT scan lines, and glowing effects
   - **Pixel Art Retro**: 8-bit NES-style with blocky pixels, animated sprites, spinning coins, and classic game feel
+  - **ASCII Terminal**: Classic green-on-black terminal using only Unicode text characters (☺ ≈ █ ✦), monospace font, scan lines
 - **Theme Selection**: Choose your visual style at the start screen using arrow keys
 - **Fully Responsive**: Automatically adapts to any screen size from mobile phones to ultra-wide monitors
 - **Smooth Animations**: Coins spin, lava bubbles, explosions blink, hazards move
