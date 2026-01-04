@@ -645,10 +645,265 @@ const PIXEL_ART_THEME = {
   }
 };
 
+const ASCII_THEME = {
+  name: "ASCII Terminal",
+
+  colors: {
+    terminal: [0, 255, 0],        // classic green terminal
+    terminalDim: [0, 180, 0],     // dimmer green
+    background: [0, 0, 0],        // black background
+    amber: [255, 191, 0],         // amber/gold
+    red: [255, 0, 0],             // danger red
+    white: [255, 255, 255],       // white
+    gray: [128, 128, 128],        // gray
+    // Required colors for game engine
+    deepPurple: [0, 50, 0],
+    purple: [0, 120, 0],
+    cyan: [0, 255, 255],
+    pink: [0, 255, 0]
+  },
+
+  drawBackground: function() {
+    // Terminal-style background
+    background(...this.colors.background);
+
+    // Scan line effect
+    push();
+    stroke(0, 255, 0, 10);
+    strokeWeight(1);
+    for (let y = 0; y < VIEW_PIXELS; y += 4) {
+      line(0, y, VIEW_PIXELS, y);
+    }
+    pop();
+
+    // Subtle grid
+    push();
+    stroke(0, 255, 0, 8);
+    strokeWeight(1);
+    let gridSize = TILE_SIZE;
+    for (let x = 0; x < VIEW_PIXELS; x += gridSize) {
+      line(x, 0, x, VIEW_PIXELS);
+    }
+    for (let y = 0; y < VIEW_PIXELS; y += gridSize) {
+      line(0, y, VIEW_PIXELS, y);
+    }
+    pop();
+  },
+
+  drawTile: function(type, x, y, wx, wy) {
+    let cx = x + TILE_SIZE / 2;
+    let cy = y + TILE_SIZE / 2;
+
+    push();
+    textAlign(CENTER, CENTER);
+    textFont('Courier New');
+    textSize(TILE_SIZE * 0.8);
+    noStroke();
+
+    switch (type) {
+      case "floor":
+        // Scattered dots
+        if ((wx + wy) % 3 === 0) {
+          fill(...this.colors.terminalDim);
+          text("·", cx, cy);
+        }
+        break;
+
+      case "grass":
+        // Wavy grass
+        fill(...this.colors.terminal);
+        text("≈", cx, cy);
+        break;
+
+      case "lava":
+        // Animated lava characters
+        let lavaFrame = floor(frameCount / 10) % 3;
+        fill(...this.colors.red);
+        let lavaChars = ["≋", "≈", "∼"];
+        text(lavaChars[lavaFrame], cx, cy);
+        break;
+
+      case "coin":
+        // Spinning coin
+        let coinFrame = floor(frameCount / 8) % 4;
+        fill(...this.colors.amber);
+        let coinChars = ["◯", "◐", "●", "◑"];
+        text(coinChars[coinFrame], cx, cy);
+        break;
+
+      case "wall":
+        // Solid block
+        fill(...this.colors.terminal);
+        text("█", cx, cy);
+        break;
+
+      case "shrine":
+        // Pulsing shrine
+        let shrineGlow = sin(frameCount * 0.1) * 0.3 + 0.7;
+        fill(...this.colors.cyan.slice(0, 3), 255 * shrineGlow);
+        text("✦", cx, cy);
+        break;
+
+      case "explosion":
+        let timer = explosionTimers[wy][wx];
+
+        if (timer <= 10) {
+          // Exploding
+          fill(...this.colors.amber);
+          let explodeFrame = floor(frameCount / 3) % 3;
+          let explodeChars = ["✱", "※", "✹"];
+          text(explodeChars[explodeFrame], cx, cy);
+        } else if (timer < 30) {
+          // Warning - blinking
+          let blink = floor(timer / 5) % 2;
+          fill(blink ? ...this.colors.red : ...this.colors.amber);
+          text("!", cx, cy);
+        } else {
+          // Safe
+          fill(...this.colors.amber);
+          text("*", cx, cy);
+        }
+        break;
+
+      case "moving_hazard":
+        // Animated enemy
+        let enemyFrame = floor(frameCount / 10) % 2;
+        fill(...this.colors.red);
+        text(enemyFrame === 0 ? "◉" : "●", cx, cy);
+        break;
+    }
+    pop();
+  },
+
+  drawPlayer: function(x, y, hurt) {
+    push();
+    textAlign(CENTER, CENTER);
+    textFont('Courier New');
+    textSize(TILE_SIZE * 0.9);
+    noStroke();
+
+    if (hurt) {
+      fill(...this.colors.red);
+      text("☹", x, y);
+    } else {
+      fill(...this.colors.terminal);
+      text("☺", x, y);
+    }
+    pop();
+  },
+
+  drawHoverHighlight: function(tx, ty) {
+    push();
+    noFill();
+    stroke(...this.colors.amber);
+    strokeWeight(2);
+    rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    pop();
+  },
+
+  drawHUD: function(score, lives, tileInfo) {
+    const pad = max(TILE_SIZE * 0.3, 10);
+    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
+    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
+    const fontSize = max(TILE_SIZE * 0.4, 12);
+    const smallFontSize = max(TILE_SIZE * 0.35, 10);
+
+    push();
+    textFont('Courier New');
+
+    // Score box with ASCII border
+    fill(...this.colors.background, 200);
+    rect(pad, pad, w, h);
+    noFill();
+    stroke(...this.colors.terminal);
+    strokeWeight(2);
+    rect(pad, pad, w, h);
+
+    // Score
+    fill(...this.colors.amber);
+    textAlign(LEFT, TOP);
+    textSize(fontSize);
+    text(`$${score}`, pad + 10, pad + 5);
+
+    // Hearts for lives (ASCII style)
+    textSize(fontSize);
+    let heartStr = "";
+    for (let i = 0; i < lives; i++) {
+      heartStr += "♥";
+    }
+    fill(...this.colors.red);
+    text(heartStr, pad + 10, pad + h * 0.5);
+
+    // Tile info
+    if (tileInfo) {
+      const ix = VIEW_PIXELS - w - pad;
+      fill(...this.colors.background, 200);
+      rect(ix, pad, w, h);
+      noFill();
+      stroke(...this.colors.terminal);
+      strokeWeight(2);
+      rect(ix, pad, w, h);
+
+      fill(...this.colors.terminal);
+      textSize(smallFontSize);
+      text(`${tileInfo.type}`, ix + 10, pad + 5);
+      text(`[${tileInfo.x},${tileInfo.y}]`, ix + 10, pad + h * 0.5);
+    }
+
+    // Instructions
+    fill(...this.colors.terminalDim);
+    textAlign(CENTER);
+    textSize(smallFontSize);
+    text("> ARROW KEYS / D-PAD <", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
+    pop();
+  },
+
+  drawControls: function(dpadConfig) {
+    const s = dpadConfig.size,
+      o = dpadConfig.dist,
+      cx = dpadConfig.cx,
+      cy = dpadConfig.cy;
+
+    push();
+    textFont('Courier New');
+
+    // Terminal-style D-pad
+    fill(...this.colors.background, 180);
+    ellipse(cx, cy, s * 2.2);
+
+    stroke(...this.colors.terminal);
+    strokeWeight(2);
+    noFill();
+    ellipse(cx, cy, s * 2.2);
+
+    // Button circles
+    fill(...this.colors.background, 200);
+    stroke(...this.colors.terminal);
+    strokeWeight(2);
+    ellipse(cx - o, cy, s);
+    ellipse(cx + o, cy, s);
+    ellipse(cx, cy - o, s);
+    ellipse(cx, cy + o, s);
+
+    // ASCII arrows
+    fill(...this.colors.terminal);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(max(s * 0.6, 18));
+    text("←", cx - o, cy);
+    text("→", cx + o, cy);
+    text("↑", cx, cy - o);
+    text("↓", cx, cy + o);
+
+    pop();
+  }
+};
+
 // Available themes array
 const THEMES = [
   VAPORWAVE_THEME,
-  PIXEL_ART_THEME
+  PIXEL_ART_THEME,
+  ASCII_THEME
 ];
 
 // Active theme - swap this to change the entire visual style!
