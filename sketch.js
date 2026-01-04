@@ -145,7 +145,46 @@ const VAPORWAVE_THEME = {
         fill(255, 255, 255);
         ellipse(cx, cy, base * 0.2);
         break;
+      case "explosion":
+        let timer = explosionTimers[wy][wx];
+        let danger = timer < 30 ? map(timer, 0, 30, 255, 0) : 0;
+        let warning = timer > 30 ? sin(timer * 0.3) * 128 + 128 : 255;
+
+        if (timer < 10) {
+          // Exploding!
+          fill(255, 100, 0, 200);
+          ellipse(cx, cy, base * 1.8);
+          fill(255, 200, 0);
+          ellipse(cx, cy, base * 1.2);
+        } else if (timer < 30) {
+          // About to explode
+          fill(255, danger, 0, 150);
+          ellipse(cx, cy, base * 1.3);
+          fill(255, 150, 0);
+          ellipse(cx, cy, base * 0.8);
+        } else {
+          // Warning state
+          fill(255, 200, 0, warning * 0.5);
+          ellipse(cx, cy, base * 1.1);
+          fill(255, 200, 0, warning);
+          ellipse(cx, cy, base * 0.6);
+        }
+        break;
     }
+    pop();
+  },
+
+  drawMovingObstacle: function(x, y) {
+    push();
+    let pulse = sin(frameCount * 0.15) * 0.2 + 0.8;
+
+    // Red glowing enemy
+    fill(255, 0, 0, 80);
+    ellipse(x, y, TILE_SIZE * 0.9 * pulse);
+    fill(255, 50, 50);
+    ellipse(x, y, TILE_SIZE * 0.7);
+    fill(150, 0, 0);
+    ellipse(x, y, TILE_SIZE * 0.4);
     pop();
   },
 
@@ -279,6 +318,8 @@ let player = { x: 64, y: 64, lives: 3, hurtTimer: 0 };
 let world = [];
 let revealed = [];
 let biomes = []; // biome map
+let explosionTimers = []; // tracks explosion countdowns
+let movingObstacles = []; // moving hazards
 let score = 0;
 let startX = 64,
   startY = 64;
@@ -328,6 +369,10 @@ function draw() {
   /* ─── background ─── */
   CURRENT_THEME.drawBackground();
 
+  /* ─── update game state ─── */
+  updateExplosions();
+  updateMovingObstacles();
+
   /* ─── camera shake ─── */
   push();
   if (shake.duration > 0) {
@@ -374,6 +419,17 @@ function draw() {
     ty = floor(mouseY / TILE_SIZE);
   if (tx >= 0 && tx < FIXED_VIEW_TILES && ty >= 0 && ty < FIXED_VIEW_TILES) {
     CURRENT_THEME.drawHoverHighlight(tx, ty);
+  }
+
+  /* ─── moving obstacles ─── */
+  for (let obs of movingObstacles) {
+    let ox = obs.x - camX;
+    let oy = obs.y - camY;
+    if (ox >= 0 && ox < FIXED_VIEW_TILES && oy >= 0 && oy < FIXED_VIEW_TILES) {
+      if (revealed[obs.y][obs.x]) {
+        CURRENT_THEME.drawMovingObstacle(ox * TILE_SIZE + TILE_SIZE / 2, oy * TILE_SIZE + TILE_SIZE / 2);
+      }
+    }
   }
 
   /* ─── player ──── */
@@ -440,18 +496,88 @@ function tryMove(dx, dy) {
     player.y = ny;
     revealAround(nx, ny);
     collectCoin(nx, ny);
-    checkLava(nx, ny);
+    checkHazards(nx, ny);
   }
 }
 
-function checkLava(x, y) {
+function checkHazards(x, y) {
+  // Check lava
   if (world[y][x] === "lava") {
-    player.lives--;
-    player.hurtTimer = 15;
-    shake = { duration: 10, magnitude: 5 };
-    if (player.lives <= 0) {
-      score = 0;
-      Object.assign(player, { x: startX, y: startY, lives: 3, hurtTimer: 30 });
+    damagePlayer();
+  }
+
+  // Check explosion tiles (if currently exploding)
+  if (world[y][x] === "explosion" && explosionTimers[y][x] < 10) {
+    damagePlayer();
+  }
+
+  // Check moving obstacles
+  for (let obs of movingObstacles) {
+    if (obs.x === x && obs.y === y) {
+      damagePlayer();
+      break;
+    }
+  }
+}
+
+function damagePlayer() {
+  player.lives--;
+  player.hurtTimer = 15;
+  shake = { duration: 10, magnitude: 5 };
+  if (player.lives <= 0) {
+    score = 0;
+    Object.assign(player, { x: startX, y: startY, lives: 3, hurtTimer: 30 });
+  }
+}
+
+function updateExplosions() {
+  // Update explosion timers
+  for (let y = 0; y < WORLD_SIZE; y++) {
+    for (let x = 0; x < WORLD_SIZE; x++) {
+      if (world[y][x] === "explosion") {
+        explosionTimers[y][x]--;
+        if (explosionTimers[y][x] <= 0) {
+          explosionTimers[y][x] = 120; // reset timer (2 seconds at 60fps)
+        }
+      }
+    }
+  }
+}
+
+function updateMovingObstacles() {
+  for (let obs of movingObstacles) {
+    obs.moveTimer++;
+    if (obs.moveTimer >= obs.moveSpeed) {
+      obs.moveTimer = 0;
+
+      // Try to move
+      let nx = obs.x + obs.dirX;
+      let ny = obs.y + obs.dirY;
+
+      // Bounce off walls or boundaries
+      if (
+        nx < 0 || nx >= WORLD_SIZE || ny < 0 || ny >= WORLD_SIZE ||
+        world[ny][nx] === "wall"
+      ) {
+        // Reverse direction
+        obs.dirX *= -1;
+        obs.dirY *= -1;
+      } else {
+        // Move
+        obs.x = nx;
+        obs.y = ny;
+      }
+
+      // Occasionally change direction
+      if (random() < 0.1) {
+        obs.dirX = random([-1, 0, 1]);
+        obs.dirY = random([-1, 0, 1]);
+      }
+    }
+
+    // Check collision with player
+    if (obs.x === player.x && obs.y === player.y) {
+      damagePlayer();
     }
   }
 }
@@ -475,9 +601,10 @@ function generateWorld() {
     for (let x = 0; x < WORLD_SIZE; x++) {
       let n = noise(x * noiseScale, y * noiseScale);
 
-      if (n < 0.25) biomes[y][x] = BIOMES.LAVA_FIELDS;
-      else if (n < 0.5) biomes[y][x] = BIOMES.NEON_CITY;
-      else if (n < 0.75) biomes[y][x] = BIOMES.CRYSTAL_GARDEN;
+      // Increased lava fields to 35%
+      if (n < 0.35) biomes[y][x] = BIOMES.LAVA_FIELDS;
+      else if (n < 0.6) biomes[y][x] = BIOMES.NEON_CITY;
+      else if (n < 0.85) biomes[y][x] = BIOMES.CRYSTAL_GARDEN;
       else biomes[y][x] = BIOMES.VOID;
     }
   }
@@ -510,6 +637,14 @@ function generateWorld() {
     createPath(x1, y1, x2, y2);
   }
 
+  // Initialize explosion timers array
+  for (let y = 0; y < WORLD_SIZE; y++) {
+    explosionTimers[y] = [];
+    for (let x = 0; x < WORLD_SIZE; x++) {
+      explosionTimers[y][x] = 0;
+    }
+  }
+
   // Fill tiles based on biomes
   for (let y = 0; y < WORLD_SIZE; y++) {
     for (let x = 0; x < WORLD_SIZE; x++) {
@@ -520,10 +655,24 @@ function generateWorld() {
 
       switch(biome) {
         case BIOMES.LAVA_FIELDS:
-          world[y][x] = r < 0.3 ? "lava" : r < 0.4 ? "wall" : r < 0.45 ? "coin" : "floor";
+          // More lava, plus explosion tiles
+          world[y][x] = r < 0.45 ? "lava"
+                      : r < 0.55 ? "wall"
+                      : r < 0.6 ? "coin"
+                      : r < 0.65 ? "explosion"
+                      : "floor";
+          if (world[y][x] === "explosion") {
+            explosionTimers[y][x] = floor(random(60, 180)); // random initial timer
+          }
           break;
         case BIOMES.NEON_CITY:
-          world[y][x] = r < 0.25 ? "wall" : r < 0.35 ? "coin" : "floor";
+          world[y][x] = r < 0.25 ? "wall"
+                      : r < 0.35 ? "coin"
+                      : r < 0.38 ? "explosion"
+                      : "floor";
+          if (world[y][x] === "explosion") {
+            explosionTimers[y][x] = floor(random(60, 180));
+          }
           break;
         case BIOMES.CRYSTAL_GARDEN:
           world[y][x] = r < 0.5 ? "grass" : r < 0.6 ? "coin" : "floor";
@@ -543,6 +692,23 @@ function generateWorld() {
     let sx = floor(random(10, WORLD_SIZE - 10));
     let sy = floor(random(10, WORLD_SIZE - 10));
     createShrine(sx, sy);
+  }
+
+  // Create moving obstacles
+  for (let i = 0; i < 15; i++) {
+    let mx = floor(random(10, WORLD_SIZE - 10));
+    let my = floor(random(10, WORLD_SIZE - 10));
+    // Avoid placing on walls or starting area
+    if (dist(mx, my, startX, startY) > 15 && world[my][mx] !== "wall") {
+      movingObstacles.push({
+        x: mx,
+        y: my,
+        dirX: random([-1, 0, 1]),
+        dirY: random([-1, 0, 1]),
+        moveTimer: 0,
+        moveSpeed: floor(random(20, 40)) // frames between moves
+      });
+    }
   }
 }
 
