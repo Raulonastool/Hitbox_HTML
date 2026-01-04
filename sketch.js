@@ -687,10 +687,10 @@ function generateWorld() {
     for (let rx = 0; rx < WORLD_SIZE / regionSize; rx++) {
       let r = random();
       // Distribute regions more evenly
-      if (r < 0.40) regions[ry][rx] = BIOMES.LAVA_FIELDS; // 40%
-      else if (r < 0.65) regions[ry][rx] = BIOMES.CRYSTAL_GARDEN; // 25%
-      else if (r < 0.85) regions[ry][rx] = BIOMES.NEON_CITY; // 20%
-      else regions[ry][rx] = BIOMES.VOID; // 15%
+      if (r < 0.25) regions[ry][rx] = BIOMES.LAVA_FIELDS; // 25%
+      else if (r < 0.55) regions[ry][rx] = BIOMES.CRYSTAL_GARDEN; // 30%
+      else if (r < 0.80) regions[ry][rx] = BIOMES.NEON_CITY; // 25%
+      else regions[ry][rx] = BIOMES.VOID; // 20%
     }
   }
 
@@ -763,12 +763,12 @@ function generateWorld() {
 
       switch(biome) {
         case BIOMES.LAVA_FIELDS:
-          // More lava, plus explosion tiles
-          world[y][x] = r < 0.45 ? "lava"
-                      : r < 0.55 ? "wall"
-                      : r < 0.6 ? "coin"
-                      : r < 0.65 ? "explosion"
-                      : "floor";
+          // Less static lava, more dynamic hazards
+          world[y][x] = r < 0.20 ? "lava"      // 20% lava (was 45%)
+                      : r < 0.30 ? "wall"      // 10% walls
+                      : r < 0.40 ? "coin"      // 10% coins
+                      : r < 0.55 ? "explosion" // 15% explosions (was 5%)
+                      : "floor";               // 45% floor for exploring!
           if (world[y][x] === "explosion") {
             explosionTimers[y][x] = floor(random(60, 180)); // random initial timer
           }
