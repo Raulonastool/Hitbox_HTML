@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Libraries (keep local copies but don't track if using CDN)
+p5.sound.min.js
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
