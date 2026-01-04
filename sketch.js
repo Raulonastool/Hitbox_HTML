@@ -228,52 +228,58 @@ const VAPORWAVE_THEME = {
   },
 
   drawHUD: function(score, lives, tileInfo) {
-    // Responsive sizing based on screen size
-    const pad = max(TILE_SIZE * 0.3, 10);
-    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
-    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
-    const fontSize = max(TILE_SIZE * 0.4, 12);
-    const smallFontSize = max(TILE_SIZE * 0.35, 10);
+    // Better responsive sizing
+    const pad = max(TILE_SIZE * 0.4, 8);
+    const fontSize = max(TILE_SIZE * 0.45, 11);
+    const lineHeight = fontSize * 1.4; // Proper line spacing
+    const boxPadding = max(TILE_SIZE * 0.2, 6);
+
+    // Calculate box height based on text
+    const h = boxPadding * 2 + lineHeight * 2;
+    const w = max(TILE_SIZE * 5, VIEW_PIXELS * 0.22);
 
     /* scoreboard */
     push();
     fill(...this.colors.deepPurple, 200);
-    rect(pad, pad, w, h, 8);
+    rect(pad, pad, w, h, 6);
     noFill();
     stroke(...this.colors.pink);
     strokeWeight(2);
-    rect(pad, pad, w, h, 8);
+    rect(pad, pad, w, h, 6);
     pop();
 
     fill(...this.colors.cyan);
     textAlign(LEFT, TOP);
     textSize(fontSize);
-    text(`Score: ${score}`, pad + 10, pad + 5);
-    text(`Lives: ${lives}`, pad + 10, pad + h * 0.5);
+    text(`Score: ${score}`, pad + boxPadding, pad + boxPadding);
+    text(`Lives: ${lives}`, pad + boxPadding, pad + boxPadding + lineHeight);
 
     /* tile info */
     if (tileInfo) {
       const ix = VIEW_PIXELS - w - pad;
       push();
       fill(...this.colors.deepPurple, 200);
-      rect(ix, pad, w, h, 8);
+      rect(ix, pad, w, h, 6);
       noFill();
       stroke(...this.colors.pink);
       strokeWeight(2);
-      rect(ix, pad, w, h, 8);
+      rect(ix, pad, w, h, 6);
       pop();
 
       fill(...this.colors.cyan);
-      textSize(smallFontSize);
-      text(`Tile: ${tileInfo.type}`, ix + 10, pad + 5);
-      text(`(${tileInfo.x}, ${tileInfo.y})`, ix + 10, pad + h * 0.5);
+      textSize(fontSize * 0.9);
+      textAlign(LEFT, TOP);
+      text(`${tileInfo.type}`, ix + boxPadding, pad + boxPadding);
+      text(`[${tileInfo.x},${tileInfo.y}]`, ix + boxPadding, pad + boxPadding + lineHeight);
     }
 
-    /* instruction */
-    fill(...this.colors.pink, 200);
-    textAlign(CENTER);
-    textSize(smallFontSize);
-    text("Arrow keys or on-screen D-pad", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
+    /* instruction - only show if enough space */
+    if (VIEW_PIXELS > 400) {
+      fill(...this.colors.pink, 200);
+      textAlign(CENTER);
+      textSize(fontSize * 0.8);
+      text("Arrow keys or D-pad", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
+    }
   },
 
   drawControls: function(dpadConfig) {
@@ -564,11 +570,15 @@ const PIXEL_ART_THEME = {
   },
 
   drawHUD: function(score, lives, tileInfo) {
-    const pad = max(TILE_SIZE * 0.3, 10);
-    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
-    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
-    const fontSize = max(TILE_SIZE * 0.4, 12);
-    const smallFontSize = max(TILE_SIZE * 0.35, 10);
+    // Better responsive sizing
+    const pad = max(TILE_SIZE * 0.4, 8);
+    const fontSize = max(TILE_SIZE * 0.45, 11);
+    const lineHeight = fontSize * 1.5; // Extra spacing for pixel hearts
+    const boxPadding = max(TILE_SIZE * 0.2, 6);
+
+    // Calculate box height based on content
+    const h = boxPadding * 2 + lineHeight * 2;
+    const w = max(TILE_SIZE * 5, VIEW_PIXELS * 0.22);
 
     push();
     // Retro box style
@@ -580,13 +590,14 @@ const PIXEL_ART_THEME = {
     fill(...this.colors.coin);
     textAlign(LEFT, TOP);
     textSize(fontSize);
-    text(`${score}`, pad + 10, pad + 5);
+    text(`${score}`, pad + boxPadding, pad + boxPadding);
 
     // Hearts for lives
     fill(248, 56, 0);
+    let heartSize = max(fontSize * 0.7, 8);
+    let heartsY = pad + boxPadding + lineHeight;
     for (let i = 0; i < lives; i++) {
-      let heartSize = max(fontSize * 0.6, 8);
-      rect(pad + 10 + i * (heartSize + 4), pad + h * 0.5, heartSize, heartSize);
+      rect(pad + boxPadding + i * (heartSize + 3), heartsY, heartSize, heartSize);
     }
 
     // Tile info
@@ -598,16 +609,19 @@ const PIXEL_ART_THEME = {
       rect(ix + 2, pad + 2, w - 4, h - 4);
 
       fill(...this.colors.white);
-      textSize(smallFontSize);
-      text(`${tileInfo.type}`, ix + 10, pad + 5);
-      text(`${tileInfo.x},${tileInfo.y}`, ix + 10, pad + h * 0.5);
+      textSize(fontSize * 0.9);
+      textAlign(LEFT, TOP);
+      text(`${tileInfo.type}`, ix + boxPadding, pad + boxPadding);
+      text(`[${tileInfo.x},${tileInfo.y}]`, ix + boxPadding, pad + boxPadding + lineHeight);
     }
 
-    // Instructions
-    fill(...this.colors.white);
-    textAlign(CENTER);
-    textSize(smallFontSize);
-    text("ARROW KEYS / D-PAD", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
+    // Instructions - only show if enough space
+    if (VIEW_PIXELS > 400) {
+      fill(...this.colors.white);
+      textAlign(CENTER);
+      textSize(fontSize * 0.8);
+      text("ARROW KEYS / D-PAD", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
+    }
     pop();
   },
 
@@ -806,11 +820,15 @@ const ASCII_THEME = {
   },
 
   drawHUD: function(score, lives, tileInfo) {
-    const pad = max(TILE_SIZE * 0.3, 10);
-    const w = min(TILE_SIZE * 6, VIEW_PIXELS * 0.25);
-    const h = min(TILE_SIZE * 2, VIEW_PIXELS * 0.08);
-    const fontSize = max(TILE_SIZE * 0.4, 12);
-    const smallFontSize = max(TILE_SIZE * 0.35, 10);
+    // Better responsive sizing
+    const pad = max(TILE_SIZE * 0.4, 8);
+    const fontSize = max(TILE_SIZE * 0.45, 11);
+    const lineHeight = fontSize * 1.4; // Proper line spacing
+    const boxPadding = max(TILE_SIZE * 0.2, 6);
+
+    // Calculate box height based on text
+    const h = boxPadding * 2 + lineHeight * 2;
+    const w = max(TILE_SIZE * 5, VIEW_PIXELS * 0.22);
 
     push();
     textFont('Courier New');
@@ -827,7 +845,7 @@ const ASCII_THEME = {
     fill(...this.colors.amber);
     textAlign(LEFT, TOP);
     textSize(fontSize);
-    text(`$${score}`, pad + 10, pad + 5);
+    text(`$${score}`, pad + boxPadding, pad + boxPadding);
 
     // Hearts for lives (ASCII style)
     textSize(fontSize);
@@ -836,7 +854,7 @@ const ASCII_THEME = {
       heartStr += "♥";
     }
     fill(...this.colors.red);
-    text(heartStr, pad + 10, pad + h * 0.5);
+    text(heartStr, pad + boxPadding, pad + boxPadding + lineHeight);
 
     // Tile info
     if (tileInfo) {
@@ -849,16 +867,19 @@ const ASCII_THEME = {
       rect(ix, pad, w, h);
 
       fill(...this.colors.terminal);
-      textSize(smallFontSize);
-      text(`${tileInfo.type}`, ix + 10, pad + 5);
-      text(`[${tileInfo.x},${tileInfo.y}]`, ix + 10, pad + h * 0.5);
+      textSize(fontSize * 0.9);
+      textAlign(LEFT, TOP);
+      text(`${tileInfo.type}`, ix + boxPadding, pad + boxPadding);
+      text(`[${tileInfo.x},${tileInfo.y}]`, ix + boxPadding, pad + boxPadding + lineHeight);
     }
 
-    // Instructions
-    fill(...this.colors.terminalDim);
-    textAlign(CENTER);
-    textSize(smallFontSize);
-    text("> ARROW KEYS / D-PAD <", VIEW_PIXELS / 2, VIEW_PIXELS - max(TILE_SIZE * 0.5, 15));
+    // Instructions - only show if enough space
+    if (VIEW_PIXELS > 400) {
+      fill(...this.colors.terminalDim);
+      textAlign(CENTER);
+      textSize(fontSize * 0.8);
+      text("> ARROW KEYS / D-PAD <", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
+    }
     pop();
   },
 
