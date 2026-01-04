@@ -150,8 +150,8 @@ const VAPORWAVE_THEME = {
         let danger = timer < 30 ? map(timer, 0, 30, 255, 0) : 0;
         let warning = timer > 30 ? sin(timer * 0.3) * 128 + 128 : 255;
 
-        if (timer < 10) {
-          // Exploding!
+        if (timer <= 10) {
+          // Exploding! DANGER!
           fill(255, 100, 0, 200);
           ellipse(cx, cy, base * 1.8);
           fill(255, 200, 0);
@@ -170,21 +170,24 @@ const VAPORWAVE_THEME = {
           ellipse(cx, cy, base * 0.6);
         }
         break;
+      case "moving_hazard":
+        // Animated moving lava orb
+        let movePulse = sin(frameCount * 0.2) * 0.3 + 0.7;
+        let moveGlow = sin(frameCount * 0.15) * 100 + 155;
+
+        // Outer glow
+        fill(255, 50, 0, 100 * movePulse);
+        ellipse(cx, cy, base * 1.6);
+
+        // Lava orb
+        fill(255, moveGlow, 0);
+        ellipse(cx, cy, base * 1.0 * movePulse);
+
+        // Hot core
+        fill(255, 255, 100);
+        ellipse(cx, cy, base * 0.4);
+        break;
     }
-    pop();
-  },
-
-  drawMovingObstacle: function(x, y) {
-    push();
-    let pulse = sin(frameCount * 0.15) * 0.2 + 0.8;
-
-    // Red glowing enemy
-    fill(255, 0, 0, 80);
-    ellipse(x, y, TILE_SIZE * 0.9 * pulse);
-    fill(255, 50, 50);
-    ellipse(x, y, TILE_SIZE * 0.7);
-    fill(150, 0, 0);
-    ellipse(x, y, TILE_SIZE * 0.4);
     pop();
   },
 
@@ -329,7 +332,7 @@ let world = [];
 let revealed = [];
 let biomes = []; // biome map
 let explosionTimers = []; // tracks explosion countdowns
-let movingObstacles = []; // moving hazards
+let movingHazards = []; // simple tile-based moving hazards
 let score = 0;
 let startX = 64,
   startY = 64;
@@ -385,7 +388,12 @@ function draw() {
 
   /* ─── update game state ─── */
   updateExplosions();
-  updateMovingObstacles();
+  updateMovingHazards();
+
+  /* ─── check hazards continuously (for explosions while standing still) ─── */
+  if (frameCount % 5 === 0) { // check every 5 frames
+    checkHazards(player.x, player.y);
+  }
 
   /* ─── camera shake ─── */
   push();
@@ -435,17 +443,7 @@ function draw() {
     CURRENT_THEME.drawHoverHighlight(tx, ty);
   }
 
-  /* ─── moving obstacles ─── */
-  for (let obs of movingObstacles) {
-    let ox = obs.x - camX;
-    let oy = obs.y - camY;
-    // Draw moving obstacles if in viewport (they're always visible as active threats)
-    if (ox >= 0 && ox < FIXED_VIEW_TILES && oy >= 0 && oy < FIXED_VIEW_TILES) {
-      CURRENT_THEME.drawMovingObstacle(ox * TILE_SIZE + TILE_SIZE / 2, oy * TILE_SIZE + TILE_SIZE / 2);
-      // Auto-reveal tiles around moving obstacles so player can see them
-      revealAround(obs.x, obs.y);
-    }
-  }
+  /* Moving hazards are rendered as regular tiles in the tile loop above */
 
   /* ─── player ──── */
   let px = (player.x - camX) * TILE_SIZE + TILE_SIZE / 2;
@@ -599,19 +597,19 @@ function checkHazards(x, y) {
   // Check lava
   if (world[y][x] === "lava") {
     damagePlayer();
+    return;
   }
 
   // Check explosion tiles (if currently exploding)
-  if (world[y][x] === "explosion" && explosionTimers[y][x] < 10) {
+  if (world[y][x] === "explosion" && explosionTimers[y][x] <= 10) {
     damagePlayer();
+    return;
   }
 
-  // Check moving obstacles
-  for (let obs of movingObstacles) {
-    if (obs.x === x && obs.y === y) {
-      damagePlayer();
-      break;
-    }
+  // Check moving hazard tiles
+  if (world[y][x] === "moving_hazard") {
+    damagePlayer();
+    return;
   }
 }
 
@@ -639,40 +637,30 @@ function updateExplosions() {
   }
 }
 
-function updateMovingObstacles() {
-  for (let obs of movingObstacles) {
-    obs.moveTimer++;
-    if (obs.moveTimer >= obs.moveSpeed) {
-      obs.moveTimer = 0;
+function updateMovingHazards() {
+  // Update each moving hazard (simple tile-based movement)
+  for (let hazard of movingHazards) {
+    hazard.moveTimer++;
+    if (hazard.moveTimer >= hazard.moveSpeed) {
+      hazard.moveTimer = 0;
 
-      // Try to move
-      let nx = obs.x + obs.dirX;
-      let ny = obs.y + obs.dirY;
+      // Clear old position
+      world[hazard.y][hazard.x] = hazard.underTile;
 
-      // Bounce off walls or boundaries
-      if (
-        nx < 0 || nx >= WORLD_SIZE || ny < 0 || ny >= WORLD_SIZE ||
-        world[ny][nx] === "wall"
-      ) {
-        // Reverse direction
-        obs.dirX *= -1;
-        obs.dirY *= -1;
-      } else {
-        // Move
-        obs.x = nx;
-        obs.y = ny;
+      // Move along path
+      hazard.pathProgress++;
+      if (hazard.pathProgress >= hazard.path.length) {
+        hazard.pathProgress = 0; // loop path
       }
 
-      // Occasionally change direction
-      if (random() < 0.1) {
-        obs.dirX = random([-1, 0, 1]);
-        obs.dirY = random([-1, 0, 1]);
-      }
-    }
+      // Update position
+      let newPos = hazard.path[hazard.pathProgress];
+      hazard.x = newPos.x;
+      hazard.y = newPos.y;
 
-    // Check collision with player
-    if (obs.x === player.x && obs.y === player.y) {
-      damagePlayer();
+      // Save what's under the new position and place hazard
+      hazard.underTile = world[hazard.y][hazard.x];
+      world[hazard.y][hazard.x] = "moving_hazard";
     }
   }
 }
@@ -814,32 +802,62 @@ function generateWorld() {
     createShrine(sx, sy);
   }
 
-  // Create moving obstacles
-  let obsCreated = 0;
+  // Create moving hazards (simple tile-based that follow paths)
+  let hazardsCreated = 0;
   let attempts = 0;
-  while (obsCreated < 20 && attempts < 100) {
+  while (hazardsCreated < 10 && attempts < 50) {
     attempts++;
-    let mx = floor(random(10, WORLD_SIZE - 10));
-    let my = floor(random(10, WORLD_SIZE - 10));
+    let mx = floor(random(15, WORLD_SIZE - 15));
+    let my = floor(random(15, WORLD_SIZE - 15));
     let distFromStart = dist(mx, my, startX, startY);
 
-    // Spawn some close (20%), some medium (40%), some far (40%)
-    let spawnChance = random();
-    let validDistance = (spawnChance < 0.2 && distFromStart > 10 && distFromStart < 25) || // close
-                        (spawnChance < 0.6 && distFromStart > 20 && distFromStart < 50) || // medium
-                        (distFromStart > 40); // far
+    // Must be far enough from start
+    if (distFromStart > 15 && world[my][mx] === "floor") {
+      // Create a simple path (either horizontal or vertical)
+      let path = [];
+      let isHorizontal = random() > 0.5;
+      let pathLength = floor(random(4, 8));
 
-    // Avoid walls and immediate starting area
-    if (validDistance && distFromStart > 10 && world[my][mx] !== "wall") {
-      movingObstacles.push({
-        x: mx,
-        y: my,
-        dirX: random([-1, 0, 1]),
-        dirY: random([-1, 0, 1]),
-        moveTimer: 0,
-        moveSpeed: floor(random(20, 40)) // frames between moves
-      });
-      obsCreated++;
+      if (isHorizontal) {
+        // Move horizontally
+        for (let i = 0; i < pathLength; i++) {
+          let px = mx + i;
+          if (px < WORLD_SIZE && world[my][px] === "floor") {
+            path.push({ x: px, y: my });
+          }
+        }
+        // Return path
+        for (let i = pathLength - 2; i > 0; i--) {
+          path.push({ x: mx + i, y: my });
+        }
+      } else {
+        // Move vertically
+        for (let i = 0; i < pathLength; i++) {
+          let py = my + i;
+          if (py < WORLD_SIZE && world[py][mx] === "floor") {
+            path.push({ x: mx, y: py });
+          }
+        }
+        // Return path
+        for (let i = pathLength - 2; i > 0; i--) {
+          path.push({ x: mx, y: my + i });
+        }
+      }
+
+      if (path.length > 2) {
+        let startPos = path[0];
+        movingHazards.push({
+          x: startPos.x,
+          y: startPos.y,
+          path: path,
+          pathProgress: 0,
+          moveTimer: floor(random(0, 30)),
+          moveSpeed: 30, // move every 30 frames (0.5 seconds)
+          underTile: world[startPos.y][startPos.x]
+        });
+        world[startPos.y][startPos.x] = "moving_hazard";
+        hazardsCreated++;
+      }
     }
   }
 }
