@@ -249,6 +249,91 @@ A future gallery where:
 - Showcase the diversity of interpretations of the same game world
 - Celebrate creativity while maintaining consistent gameplay
 
+## Testing
+
+This project includes a comprehensive test suite to ensure code quality and help contributors validate their changes.
+
+### Running Tests
+
+First, install dependencies:
+```bash
+npm install
+```
+
+Run all tests:
+```bash
+npm test
+```
+
+Run tests in watch mode (re-runs on file changes):
+```bash
+npm run test:watch
+```
+
+Generate coverage report:
+```bash
+npm run test:coverage
+```
+
+### Test Structure
+
+The test suite is organized into three categories:
+
+#### 1. Theme Structure Tests (`__tests__/theme-structure.test.js`)
+Validates that themes implement the required API correctly:
+- Required properties (name, colors)
+- Required color definitions (deepPurple, purple, cyan, pink)
+- Required methods with correct signatures
+- Includes a `validateTheme()` helper for testing custom themes
+
+**Use this when**: Creating a new theme to ensure it will work with the game
+
+#### 2. Game Constants Tests (`__tests__/game-constants.test.js`)
+Verifies game configuration and constants:
+- World size and viewport configuration
+- Biome system structure
+- Tile type definitions
+- Player configuration
+- UI settings
+
+**Use this when**: Modifying game constants or adding new tile types
+
+#### 3. Game Logic Tests (`__tests__/game-logic.test.js`)
+Tests core game mechanics and expected behavior:
+- Movement system and collision
+- Damage system and hazards
+- Fog of war revelation
+- Coin collection
+- Explosion timers
+- Moving hazard behavior
+- Biome distribution
+
+**Use this when**: Adding new game features or modifying existing logic
+
+### Testing Your Custom Theme
+
+When creating a custom theme, use the theme validator:
+
+```javascript
+// In your test file
+const { validateTheme } = require('./theme-validator');
+
+test('my custom theme is valid', () => {
+  const result = validateTheme(MY_CUSTOM_THEME);
+  expect(result.valid).toBe(true);
+  expect(result.errors).toHaveLength(0);
+});
+```
+
+### Continuous Integration
+
+Tests automatically run on GitHub when you:
+- Push commits to any branch
+- Create or update pull requests
+- Merge to main branch
+
+This ensures all contributions maintain code quality.
+
 ## Contributing
 
 This is an open-source collaborative artwork! Contributions welcome:
@@ -257,6 +342,7 @@ This is an open-source collaborative artwork! Contributions welcome:
 - **Improve gameplay**: Add new features, hazards, or mechanics
 - **Optimize**: Performance improvements, bug fixes
 - **Document**: Help others understand and extend the code
+- **Write tests**: Add tests for new features you create
 
 ## License
 

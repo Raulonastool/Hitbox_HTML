@@ -10,3 +10,17 @@ p5.sound.min.js
 *.swp
 *.swo
 *~
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Build
+dist/
+build/
