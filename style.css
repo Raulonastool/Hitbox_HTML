@@ -5,11 +5,25 @@ html, body {
   height: 100%;
   overflow: hidden;
   position: fixed;
+  /* Prevent text selection on mobile */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  /* Prevent pull-to-refresh and overscroll */
+  overscroll-behavior: none;
+  /* Ensure proper touch handling */
+  touch-action: none;
 }
+
 canvas {
   display: block;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  /* Prevent touch callouts on mobile */
+  -webkit-touch-callout: none;
+  /* Disable default touch behaviors */
+  touch-action: none;
 }

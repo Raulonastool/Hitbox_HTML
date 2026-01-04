@@ -1099,9 +1099,7 @@ function keyPressed() {
 
 function touchStarted() {
   if (gameState === "start") {
-    // Touch anywhere to start
-    startGame();
-    return false;
+    return handleStartScreenTouch();
   }
 
   /* four hit-tests against the invisible circles */
@@ -1118,9 +1116,32 @@ function touchStarted() {
 
 function mouseClicked() {
   if (gameState === "start") {
-    startGame();
+    return handleStartScreenTouch();
+  }
+}
+
+function handleStartScreenTouch() {
+  // Check if user tapped on left arrow (left 30% of screen, middle height)
+  if (THEMES.length > 1 && mouseX < VIEW_PIXELS * 0.35 &&
+      mouseY > VIEW_PIXELS * 0.48 && mouseY < VIEW_PIXELS * 0.62) {
+    // Previous theme
+    selectedThemeIndex = (selectedThemeIndex - 1 + THEMES.length) % THEMES.length;
+    CURRENT_THEME = THEMES[selectedThemeIndex];
     return false;
   }
+
+  // Check if user tapped on right arrow (right 30% of screen, middle height)
+  if (THEMES.length > 1 && mouseX > VIEW_PIXELS * 0.65 &&
+      mouseY > VIEW_PIXELS * 0.48 && mouseY < VIEW_PIXELS * 0.62) {
+    // Next theme
+    selectedThemeIndex = (selectedThemeIndex + 1) % THEMES.length;
+    CURRENT_THEME = THEMES[selectedThemeIndex];
+    return false;
+  }
+
+  // Otherwise start the game
+  startGame();
+  return false;
 }
 
 /*  START SCREEN  */
@@ -1135,6 +1156,7 @@ function drawStartScreen() {
   const themeSize = max(VIEW_PIXELS * 0.04, 14);
   const instructionSize = max(VIEW_PIXELS * 0.025, 11);
   const startSize = max(VIEW_PIXELS * 0.035, 13);
+  const arrowSize = max(VIEW_PIXELS * 0.08, 32);
 
   // Title
   push();
@@ -1148,16 +1170,32 @@ function drawStartScreen() {
   fill(200);
   text("Collaborative Explorable Artwork", VIEW_PIXELS / 2, VIEW_PIXELS * 0.4);
 
-  // Theme info
-  textSize(themeSize);
-  fill(255);
-  text(`Theme: ${CURRENT_THEME.name}`, VIEW_PIXELS / 2, VIEW_PIXELS * 0.55);
-
-  // Instructions
-  textSize(instructionSize);
-  fill(180);
+  // Theme selector with visible arrows for mobile
   if (THEMES.length > 1) {
-    text("← → to change theme", VIEW_PIXELS / 2, VIEW_PIXELS * 0.65);
+    // Left arrow
+    fill(...CURRENT_THEME.colors.cyan);
+    textSize(arrowSize);
+    text("◀", VIEW_PIXELS * 0.2, VIEW_PIXELS * 0.55);
+
+    // Theme name
+    textSize(themeSize);
+    fill(255);
+    text(CURRENT_THEME.name, VIEW_PIXELS / 2, VIEW_PIXELS * 0.55);
+
+    // Right arrow
+    fill(...CURRENT_THEME.colors.cyan);
+    textSize(arrowSize);
+    text("▶", VIEW_PIXELS * 0.8, VIEW_PIXELS * 0.55);
+
+    // Instructions
+    textSize(instructionSize);
+    fill(180);
+    text("Tap arrows or use ← → keys", VIEW_PIXELS / 2, VIEW_PIXELS * 0.65);
+  } else {
+    // Theme info (if only one theme)
+    textSize(themeSize);
+    fill(255);
+    text(`Theme: ${CURRENT_THEME.name}`, VIEW_PIXELS / 2, VIEW_PIXELS * 0.55);
   }
 
   // Start button
@@ -1165,7 +1203,7 @@ function drawStartScreen() {
   fill(...CURRENT_THEME.colors.cyan);
   let pulse = sin(frameCount * 0.1) * 0.3 + 0.7;
   fill(...CURRENT_THEME.colors.pink, 255 * pulse);
-  text("Press SPACE or Click to Start", VIEW_PIXELS / 2, VIEW_PIXELS * 0.75);
+  text("Tap Here or Press SPACE to Start", VIEW_PIXELS / 2, VIEW_PIXELS * 0.78);
 
   pop();
 }
