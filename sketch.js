@@ -756,7 +756,11 @@ const ASCII_THEME = {
         } else if (timer < 30) {
           // Warning - blinking
           let blink = floor(timer / 5) % 2;
-          fill(blink ? ...this.colors.red : ...this.colors.amber);
+          if (blink) {
+            fill(...this.colors.red);
+          } else {
+            fill(...this.colors.amber);
+          }
           text("!", cx, cy);
         } else {
           // Safe
