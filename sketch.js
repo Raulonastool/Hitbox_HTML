@@ -4,6 +4,169 @@ const FIXED_VIEW_TILES = 32; // tiles visible across
 const DPAD_MIN_PX = 40; // smallest button diameter
 
 /*  ========================================
+    AUDIO SYSTEM - Procedurally generated sounds
+    ======================================== */
+
+class AudioManager {
+  constructor() {
+    this.audioContext = null;
+    this.masterGain = null;
+    this.muted = false;
+    this.initialized = false;
+    this.currentMusicInterval = null;
+  }
+
+  init() {
+    if (this.initialized) return;
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.audioContext.createGain();
+      this.masterGain.connect(this.audioContext.destination);
+      this.masterGain.gain.value = 0.3; // Lower volume
+      this.initialized = true;
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }
+
+  playTone(frequency, duration, type = 'sine', volume = 0.3) {
+    if (!this.initialized || this.muted) return;
+
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.type = type;
+    osc.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+
+    osc.start(this.audioContext.currentTime);
+    osc.stop(this.audioContext.currentTime + duration);
+  }
+
+  playChord(frequencies, duration, type = 'sine', volume = 0.2) {
+    frequencies.forEach(freq => this.playTone(freq, duration, type, volume));
+  }
+
+  playCoinSound() {
+    this.playTone(880, 0.1, 'square', 0.2);
+    setTimeout(() => this.playTone(1320, 0.1, 'square', 0.15), 50);
+  }
+
+  playDamageSound() {
+    this.playTone(110, 0.3, 'sawtooth', 0.3);
+    this.playTone(55, 0.4, 'sawtooth', 0.2);
+  }
+
+  playExplosionSound() {
+    // White noise burst
+    if (!this.initialized || this.muted) return;
+    const bufferSize = this.audioContext.sampleRate * 0.3;
+    const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.audioContext.createBufferSource();
+    noise.buffer = buffer;
+
+    const noiseGain = this.audioContext.createGain();
+    noise.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+
+    noiseGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+
+    noise.start();
+  }
+
+  playMoveSound() {
+    this.playTone(440, 0.05, 'square', 0.1);
+  }
+
+  startMusic(theme) {
+    this.stopMusic();
+    if (!this.initialized || this.muted) return;
+
+    // Different music patterns for each theme
+    if (theme === 'Vaporwave') {
+      this.playVaporwaveMusic();
+    } else if (theme === 'Pixel Art Retro') {
+      this.playRetroMusic();
+    } else if (theme === 'ASCII Terminal') {
+      this.playTerminalMusic();
+    }
+  }
+
+  playVaporwaveMusic() {
+    // Slow, atmospheric chords
+    const chords = [
+      [261.63, 329.63, 392.00], // C major
+      [293.66, 369.99, 440.00], // D minor
+      [246.94, 311.13, 369.99], // B diminished
+      [293.66, 369.99, 440.00], // D minor
+    ];
+    let index = 0;
+
+    this.currentMusicInterval = setInterval(() => {
+      if (!this.muted && this.initialized) {
+        this.playChord(chords[index], 2.0, 'sine', 0.08);
+      }
+      index = (index + 1) % chords.length;
+    }, 2000);
+  }
+
+  playRetroMusic() {
+    // 8-bit style melody
+    const melody = [523.25, 587.33, 659.25, 523.25, 659.25, 783.99, 880.00, 783.99];
+    let index = 0;
+
+    this.currentMusicInterval = setInterval(() => {
+      if (!this.muted && this.initialized) {
+        this.playTone(melody[index], 0.3, 'square', 0.12);
+      }
+      index = (index + 1) % melody.length;
+    }, 400);
+  }
+
+  playTerminalMusic() {
+    // Minimal beeps
+    const notes = [440, 554.37, 659.25, 554.37];
+    let index = 0;
+
+    this.currentMusicInterval = setInterval(() => {
+      if (!this.muted && this.initialized) {
+        this.playTone(notes[index], 0.15, 'square', 0.06);
+      }
+      index = (index + 1) % notes.length;
+    }, 1000);
+  }
+
+  stopMusic() {
+    if (this.currentMusicInterval) {
+      clearInterval(this.currentMusicInterval);
+      this.currentMusicInterval = null;
+    }
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.muted) {
+      this.stopMusic();
+    }
+    return this.muted;
+  }
+}
+
+const audioManager = new AudioManager();
+
+/*  ========================================
     THEME SYSTEM - Swap this object to change visuals!
     ======================================== */
 
@@ -280,6 +443,15 @@ const VAPORWAVE_THEME = {
       textSize(fontSize * 0.8);
       text("Arrow keys or D-pad", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
+
+    /* mute button */
+    const muteSize = max(fontSize * 1.8, 24);
+    const muteX = VIEW_PIXELS / 2;
+    const muteY = pad + h / 2;
+    fill(...this.colors.pink, audioManager.muted ? 100 : 255);
+    textAlign(CENTER, CENTER);
+    textSize(muteSize);
+    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
   },
 
   drawControls: function(dpadConfig) {
@@ -622,6 +794,16 @@ const PIXEL_ART_THEME = {
       textSize(fontSize * 0.8);
       text("ARROW KEYS / D-PAD", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
+
+    /* mute button */
+    const muteSize = max(fontSize * 1.8, 24);
+    const muteX = VIEW_PIXELS / 2;
+    const muteY = pad + h / 2;
+    fill(audioManager.muted ? 128 : 255, 255, 0);
+    textAlign(CENTER, CENTER);
+    textSize(muteSize);
+    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
+
     pop();
   },
 
@@ -880,6 +1062,16 @@ const ASCII_THEME = {
       textSize(fontSize * 0.8);
       text("> ARROW KEYS / D-PAD <", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
+
+    /* mute button */
+    const muteSize = max(fontSize * 1.8, 24);
+    const muteX = VIEW_PIXELS / 2;
+    const muteY = pad + h / 2;
+    fill(...this.colors.terminal, audioManager.muted ? 80 : 255);
+    textAlign(CENTER, CENTER);
+    textSize(muteSize);
+    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
+
     pop();
   },
 
@@ -1123,6 +1315,24 @@ function touchStarted() {
     return handleStartScreenTouch();
   }
 
+  // Check mute button click (center top area)
+  const pad = max(TILE_SIZE * 0.4, 8);
+  const fontSize = max(TILE_SIZE * 0.45, 11);
+  const lineHeight = fontSize * 1.4;
+  const h = max(TILE_SIZE * 0.2, 6) * 2 + lineHeight * 2;
+  const muteSize = max(fontSize * 1.8, 24);
+  const muteX = VIEW_PIXELS / 2;
+  const muteY = pad + h / 2;
+
+  if (dist(mouseX, mouseY, muteX, muteY) < muteSize) {
+    const wasMuted = audioManager.toggleMute();
+    if (!wasMuted) {
+      // If unmuted, restart music
+      audioManager.startMusic(CURRENT_THEME.name);
+    }
+    return false;
+  }
+
   /* four hit-tests against the invisible circles */
   if (dist(mouseX, mouseY, dpad.cx - dpad.dist, dpad.cy) < dpad.hit)
     tryMove(-1, 0);
@@ -1138,6 +1348,24 @@ function touchStarted() {
 function mouseClicked() {
   if (gameState === "start") {
     return handleStartScreenTouch();
+  }
+
+  // Check mute button click (center top area)
+  const pad = max(TILE_SIZE * 0.4, 8);
+  const fontSize = max(TILE_SIZE * 0.45, 11);
+  const lineHeight = fontSize * 1.4;
+  const h = max(TILE_SIZE * 0.2, 6) * 2 + lineHeight * 2;
+  const muteSize = max(fontSize * 1.8, 24);
+  const muteX = VIEW_PIXELS / 2;
+  const muteY = pad + h / 2;
+
+  if (dist(mouseX, mouseY, muteX, muteY) < muteSize) {
+    const wasMuted = audioManager.toggleMute();
+    if (!wasMuted) {
+      // If unmuted, restart music
+      audioManager.startMusic(CURRENT_THEME.name);
+    }
+    return false;
   }
 }
 
@@ -1231,6 +1459,11 @@ function drawStartScreen() {
 
 function startGame() {
   gameState = "playing";
+
+  // Initialize audio on first user interaction (browser requirement)
+  audioManager.init();
+  audioManager.startMusic(CURRENT_THEME.name);
+
   generateWorld();
   revealAround(player.x, player.y);
 }
@@ -1279,6 +1512,7 @@ function damagePlayer() {
   player.lives--;
   player.hurtTimer = 15;
   shake = { duration: 10, magnitude: 5 };
+  audioManager.playDamageSound();
   if (player.lives <= 0) {
     score = 0;
     Object.assign(player, { x: startX, y: startY, lives: 3, hurtTimer: 30 });
@@ -1290,7 +1524,17 @@ function updateExplosions() {
   for (let y = 0; y < WORLD_SIZE; y++) {
     for (let x = 0; x < WORLD_SIZE; x++) {
       if (world[y][x] === "explosion") {
+        let oldTimer = explosionTimers[y][x];
         explosionTimers[y][x]--;
+
+        // Play sound when explosion starts (transitions to exploding state)
+        if (oldTimer === 11 && explosionTimers[y][x] === 10) {
+          // Only play if tile is revealed (avoid too many sounds)
+          if (revealed[y][x]) {
+            audioManager.playExplosionSound();
+          }
+        }
+
         if (explosionTimers[y][x] <= 0) {
           explosionTimers[y][x] = 120; // reset timer (2 seconds at 60fps)
         }
@@ -1608,6 +1852,7 @@ function collectCoin(x, y) {
   if (world[y][x] === "coin") {
     world[y][x] = "floor";
     score++;
+    audioManager.playCoinSound();
   }
 }
 
