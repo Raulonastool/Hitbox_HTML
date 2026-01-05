@@ -1520,6 +1520,18 @@ function damagePlayer() {
 }
 
 function updateExplosions() {
+  // Calculate camera bounds (viewport visible to player)
+  let camX = constrain(
+    player.x - FIXED_VIEW_TILES / 2,
+    0,
+    WORLD_SIZE - FIXED_VIEW_TILES
+  );
+  let camY = constrain(
+    player.y - FIXED_VIEW_TILES / 2,
+    0,
+    WORLD_SIZE - FIXED_VIEW_TILES
+  );
+
   // Update explosion timers
   for (let y = 0; y < WORLD_SIZE; y++) {
     for (let x = 0; x < WORLD_SIZE; x++) {
@@ -1529,8 +1541,12 @@ function updateExplosions() {
 
         // Play sound when explosion starts (transitions to exploding state)
         if (oldTimer === 11 && explosionTimers[y][x] === 10) {
-          // Only play if tile is revealed (avoid too many sounds)
-          if (revealed[y][x]) {
+          // Only play if tile is visible in player's viewport
+          let inViewport = (
+            x >= camX && x < camX + FIXED_VIEW_TILES &&
+            y >= camY && y < camY + FIXED_VIEW_TILES
+          );
+          if (revealed[y][x] && inViewport) {
             audioManager.playExplosionSound();
           }
         }
