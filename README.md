@@ -44,6 +44,18 @@ The dream is for artists to create their own visual themes (pixel art characters
 - **Fully Responsive**: Automatically adapts to any screen size from mobile phones to ultra-wide monitors
 - **Smooth Animations**: Coins spin, lava bubbles, explosions blink, hazards move
 
+### Audio System
+- **Procedural Audio**: All music and sound effects generated using Web Audio API - no external files
+- **Theme-Specific Music**: Each theme has its own unique background music
+  - **Vaporwave**: Slow atmospheric chords with ambient synth pads
+  - **Pixel Art Retro**: Fast-paced 8-bit chiptune melody
+  - **ASCII Terminal**: Minimal retro computer beeps
+- **Sound Effects**:
+  - Coin collection: Bright dual-tone chime
+  - Damage: Low rumbling impact
+  - Explosions: White noise burst (only when visible in viewport)
+- **Mute Button**: Toggle audio on/off with 🔊/🔇 button in the HUD
+
 ### Controls
 - **Desktop**: Arrow keys to move
 - **Mobile/Touch**: On-screen D-pad in bottom-right corner
@@ -169,8 +181,12 @@ The sky's the limit! Here are some ideas:
 
 ```
 index.html          - Main HTML file with viewport configuration
-sketch.js           - Complete game logic + theme system
+sketch.js           - Complete game logic + theme system + audio
 style.css           - Responsive styling and canvas positioning
+package.json        - Jest test configuration
+__tests__/          - Test suite (theme structure, game constants, game logic)
+.github/workflows/  - CI/CD pipeline for automated testing
+CONTRIBUTING.md     - Contribution guidelines
 README.md           - This file
 .gitignore          - Git configuration
 ```
@@ -178,18 +194,20 @@ README.md           - This file
 ## Technical Details
 
 - **Framework**: [p5.js](https://p5js.org/) v1.11.7 for canvas rendering
+- **Audio**: Web Audio API for procedural music and sound generation
 - **World Size**: 128×128 tiles (16,384 total tiles)
 - **Viewport**: 32×32 tiles visible at once
 - **Biome Generation**: Region-based (16×16 tile regions) with Perlin noise for organic boundaries
 - **Responsive Design**: Canvas fills maximum screen space while maintaining square aspect ratio
 - **Mobile Support**: Touch controls with responsive D-pad sizing and positioning
 - **Performance**: Optimized tile rendering with fog of war culling
+- **Testing**: Jest-based test suite with CI/CD via GitHub Actions
 
 ## Architecture
 
 ### Separation of Concerns
 
-The game is architected with complete separation between game logic and visual presentation:
+The game is architected with complete separation between game logic, visual presentation, and audio:
 
 **Game Logic (Pure)**:
 - World generation (`generateWorld()`)
@@ -204,6 +222,12 @@ The game is architected with complete separation between game logic and visual p
 - All rendering calls go through `CURRENT_THEME` methods
 - No game logic in theme code
 - Themes can't affect gameplay, only appearance
+
+**Audio System (Procedural)**:
+- `AudioManager` class handles all sound generation
+- Theme-specific music patterns
+- Sound effects triggered by game events
+- Independent from game logic and visuals
 
 This architecture is what enables the composable artwork vision.
 
