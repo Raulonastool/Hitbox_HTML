@@ -444,14 +444,19 @@ const VAPORWAVE_THEME = {
       text("Arrow keys or D-pad", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
 
-    /* mute button */
-    const muteSize = max(fontSize * 1.8, 24);
-    const muteX = VIEW_PIXELS / 2;
-    const muteY = pad + h / 2;
-    fill(...this.colors.pink, audioManager.muted ? 100 : 255);
+    /* settings button */
+    const settingsSize = max(fontSize * 2, 32);
+    const settingsX = VIEW_PIXELS / 2;
+    const settingsY = pad + h / 2;
+    fill(...this.colors.pink, 255);
     textAlign(CENTER, CENTER);
-    textSize(muteSize);
-    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
+    textSize(settingsSize);
+    text("⚙️", settingsX, settingsY);
+
+    // Store for hit detection
+    settingsButton.x = settingsX;
+    settingsButton.y = settingsY;
+    settingsButton.radius = settingsSize;
   },
 
   drawControls: function(dpadConfig) {
@@ -610,7 +615,7 @@ const PIXEL_ART_THEME = {
         if (coinFrame === 0 || coinFrame === 2) {
           // Full coin
           rect(x + pixelSize * 2, y + pixelSize * 1, pixelSize * 4, pixelSize * 6);
-          fill(...this.colors.black);
+          fill(180, 130, 0); // Darker shade of yellow/gold for depth
           rect(x + pixelSize * 3, y + pixelSize * 2, pixelSize * 2, pixelSize * 4);
         } else if (coinFrame === 1) {
           // Medium coin
@@ -795,14 +800,19 @@ const PIXEL_ART_THEME = {
       text("ARROW KEYS / D-PAD", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
 
-    /* mute button */
-    const muteSize = max(fontSize * 1.8, 24);
-    const muteX = VIEW_PIXELS / 2;
-    const muteY = pad + h / 2;
-    fill(audioManager.muted ? 128 : 255, 255, 0);
+    /* settings button */
+    const settingsSize = max(fontSize * 2, 32);
+    const settingsX = VIEW_PIXELS / 2;
+    const settingsY = pad + h / 2;
+    fill(255, 255, 0);
     textAlign(CENTER, CENTER);
-    textSize(muteSize);
-    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
+    textSize(settingsSize);
+    text("⚙️", settingsX, settingsY);
+
+    // Store for hit detection
+    settingsButton.x = settingsX;
+    settingsButton.y = settingsY;
+    settingsButton.radius = settingsSize;
 
     pop();
   },
@@ -1063,14 +1073,19 @@ const ASCII_THEME = {
       text("> ARROW KEYS / D-PAD <", VIEW_PIXELS / 2, VIEW_PIXELS - pad - fontSize);
     }
 
-    /* mute button */
-    const muteSize = max(fontSize * 1.8, 24);
-    const muteX = VIEW_PIXELS / 2;
-    const muteY = pad + h / 2;
-    fill(...this.colors.terminal, audioManager.muted ? 80 : 255);
+    /* settings button */
+    const settingsSize = max(fontSize * 2, 32);
+    const settingsX = VIEW_PIXELS / 2;
+    const settingsY = pad + h / 2;
+    fill(...this.colors.terminal, 255);
     textAlign(CENTER, CENTER);
-    textSize(muteSize);
-    text(audioManager.muted ? "🔇" : "🔊", muteX, muteY);
+    textSize(settingsSize);
+    text("⚙️", settingsX, settingsY);
+
+    // Store for hit detection
+    settingsButton.x = settingsX;
+    settingsButton.y = settingsY;
+    settingsButton.radius = settingsSize;
 
     pop();
   },
@@ -1132,7 +1147,7 @@ let canvas;
 let bgGradientOffset = 0; // for animated gradient
 
 /* game state */
-let gameState = "start"; // "start" or "playing"
+let gameState = "start"; // "start" or "playing" or "settings"
 let selectedThemeIndex = 0;
 
 /* player + world */
@@ -1161,6 +1176,21 @@ let shake = { duration: 0, magnitude: 0 };
 /* D-pad geometry (updated every resize) */
 const dpad = { size: 0, dist: 0, hit: 0, cx: 0, cy: 0 };
 
+/* UI settings with device detection */
+let uiSettings = {
+  dpadVisible: true,        // D-pad on/off
+  autoDetected: true,       // Using auto-detection or manual override
+  deviceType: 'unknown'     // 'mobile' | 'desktop' | 'unknown'
+};
+
+/* UI element tracking for hit-testing */
+const settingsButton = { x: 0, y: 0, radius: 0 };
+const settingsElements = {
+  dpadCheckbox: { x: 0, y: 0, size: 0 },
+  muteButton: { x: 0, y: 0, radius: 0 },
+  resumeButton: { x: 0, y: 0, w: 0, h: 0 }
+};
+
 /*  INITIALISATION */
 
 function setup() {
@@ -1172,7 +1202,27 @@ function setup() {
   noStroke();
   textFont("monospace");
 
+  // Detect device type for D-pad visibility
+  detectDevice();
+
   // World generation happens when game starts (not on setup)
+}
+
+/*  DEVICE DETECTION */
+
+function detectDevice() {
+  // Multi-factor detection for reliability
+  const checks = {
+    touchCapable: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
+    mobileUA: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+    smallScreen: window.innerWidth < 768
+  };
+
+  // Consider mobile if ANY two factors are true
+  const mobileFactors = Object.values(checks).filter(v => v).length;
+  uiSettings.deviceType = mobileFactors >= 2 ? 'mobile' : 'desktop';
+  uiSettings.dpadVisible = (uiSettings.deviceType === 'mobile');
+  uiSettings.autoDetected = true;
 }
 
 /*  RESIZE HANDLER */
@@ -1195,13 +1245,15 @@ function draw() {
   /* ─── background ─── */
   CURRENT_THEME.drawBackground();
 
-  /* ─── update game state ─── */
-  updateExplosions();
-  updateMovingHazards();
+  /* ─── update game state (only when playing) ─── */
+  if (gameState === "playing") {
+    updateExplosions();
+    updateMovingHazards();
 
-  /* ─── check hazards continuously (for explosions while standing still) ─── */
-  if (frameCount % 5 === 0) { // check every 5 frames
-    checkHazards(player.x, player.y);
+    /* ─── check hazards continuously (for explosions while standing still) ─── */
+    if (frameCount % 5 === 0) { // check every 5 frames
+      checkHazards(player.x, player.y);
+    }
   }
 
   /* ─── camera shake ─── */
@@ -1262,6 +1314,12 @@ function draw() {
 
   pop(); // end shake push
 
+  /* ─── settings screen (if active) ─── */
+  if (gameState === "settings") {
+    drawSettingsScreen();
+    return;
+  }
+
   /* ─── HUD & D-pad ── */
   let tileInfo = null;
   let hoverX = floor(mouseX / TILE_SIZE) + camX;
@@ -1270,12 +1328,31 @@ function draw() {
     tileInfo = { type: world[hoverY][hoverX], x: hoverX, y: hoverY };
   }
   CURRENT_THEME.drawHUD(score, player.lives, tileInfo);
-  CURRENT_THEME.drawControls(dpad);
+  if (uiSettings.dpadVisible) {
+    CURRENT_THEME.drawControls(dpad);
+  }
 }
 
 /*  INPUT   */
 
 function keyPressed() {
+  // ESC toggles settings (only from playing state)
+  if (keyCode === ESCAPE) {
+    if (gameState === "playing") {
+      gameState = "settings";
+      return false;
+    }
+    if (gameState === "settings") {
+      gameState = "playing";
+      return false;
+    }
+  }
+
+  // Block all other input in settings
+  if (gameState === "settings") {
+    return false;
+  }
+
   if (gameState === "start") {
     // Theme selection
     if (keyCode === LEFT_ARROW) {
@@ -1315,33 +1392,28 @@ function touchStarted() {
     return handleStartScreenTouch();
   }
 
-  // Check mute button click (center top area)
-  const pad = max(TILE_SIZE * 0.4, 8);
-  const fontSize = max(TILE_SIZE * 0.45, 11);
-  const lineHeight = fontSize * 1.4;
-  const h = max(TILE_SIZE * 0.2, 6) * 2 + lineHeight * 2;
-  const muteSize = max(fontSize * 1.8, 24);
-  const muteX = VIEW_PIXELS / 2;
-  const muteY = pad + h / 2;
-
-  if (dist(mouseX, mouseY, muteX, muteY) < muteSize) {
-    const wasMuted = audioManager.toggleMute();
-    if (!wasMuted) {
-      // If unmuted, restart music
-      audioManager.startMusic(CURRENT_THEME.name);
-    }
-    return false;
+  if (gameState === "settings") {
+    return handleSettingsClick();
   }
 
-  /* four hit-tests against the invisible circles */
-  if (dist(mouseX, mouseY, dpad.cx - dpad.dist, dpad.cy) < dpad.hit)
-    tryMove(-1, 0);
-  if (dist(mouseX, mouseY, dpad.cx + dpad.dist, dpad.cy) < dpad.hit)
-    tryMove(1, 0);
-  if (dist(mouseX, mouseY, dpad.cx, dpad.cy - dpad.dist) < dpad.hit)
-    tryMove(0, -1);
-  if (dist(mouseX, mouseY, dpad.cx, dpad.cy + dpad.dist) < dpad.hit)
-    tryMove(0, 1);
+  if (gameState === "playing") {
+    // Check settings button click
+    if (dist(mouseX, mouseY, settingsButton.x, settingsButton.y) < settingsButton.radius) {
+      gameState = "settings";
+      return false;
+    }
+
+    /* four hit-tests against the invisible circles */
+    if (dist(mouseX, mouseY, dpad.cx - dpad.dist, dpad.cy) < dpad.hit)
+      tryMove(-1, 0);
+    if (dist(mouseX, mouseY, dpad.cx + dpad.dist, dpad.cy) < dpad.hit)
+      tryMove(1, 0);
+    if (dist(mouseX, mouseY, dpad.cx, dpad.cy - dpad.dist) < dpad.hit)
+      tryMove(0, -1);
+    if (dist(mouseX, mouseY, dpad.cx, dpad.cy + dpad.dist) < dpad.hit)
+      tryMove(0, 1);
+  }
+
   return false;
 }
 
@@ -1350,22 +1422,16 @@ function mouseClicked() {
     return handleStartScreenTouch();
   }
 
-  // Check mute button click (center top area)
-  const pad = max(TILE_SIZE * 0.4, 8);
-  const fontSize = max(TILE_SIZE * 0.45, 11);
-  const lineHeight = fontSize * 1.4;
-  const h = max(TILE_SIZE * 0.2, 6) * 2 + lineHeight * 2;
-  const muteSize = max(fontSize * 1.8, 24);
-  const muteX = VIEW_PIXELS / 2;
-  const muteY = pad + h / 2;
+  if (gameState === "settings") {
+    return handleSettingsClick();
+  }
 
-  if (dist(mouseX, mouseY, muteX, muteY) < muteSize) {
-    const wasMuted = audioManager.toggleMute();
-    if (!wasMuted) {
-      // If unmuted, restart music
-      audioManager.startMusic(CURRENT_THEME.name);
+  if (gameState === "playing") {
+    // Check settings button click
+    if (dist(mouseX, mouseY, settingsButton.x, settingsButton.y) < settingsButton.radius) {
+      gameState = "settings";
+      return false;
     }
-    return false;
   }
 }
 
@@ -1882,6 +1948,178 @@ function revealAround(x, y) {
         y + dy < WORLD_SIZE
       )
         revealed[y + dy][x + dx] = true;
+}
+
+/*  SETTINGS SCREEN  */
+
+function drawSettingsScreen() {
+  // Semi-transparent overlay over frozen game
+  fill(0, 0, 0, 180);
+  rect(0, 0, VIEW_PIXELS, VIEW_PIXELS);
+
+  // Responsive sizing
+  const pad = max(TILE_SIZE * 0.8, 16);
+  const fontSize = max(TILE_SIZE * 0.5, 14);
+  const titleSize = max(TILE_SIZE * 0.8, 20);
+  const buttonHeight = max(TILE_SIZE * 1.5, 48);
+  const sectionHeight = max(TILE_SIZE * 3, 80);
+
+  // Center panel
+  const panelWidth = min(VIEW_PIXELS * 0.8, TILE_SIZE * 16);
+  const panelHeight = min(VIEW_PIXELS * 0.7, TILE_SIZE * 14);
+  const panelX = (VIEW_PIXELS - panelWidth) / 2;
+  const panelY = (VIEW_PIXELS - panelHeight) / 2;
+
+  // Panel background (theme-aware)
+  push();
+  fill(...CURRENT_THEME.colors.deepPurple, 220);
+  rect(panelX, panelY, panelWidth, panelHeight, 8);
+  noFill();
+  stroke(...CURRENT_THEME.colors.pink, 200);
+  strokeWeight(3);
+  rect(panelX, panelY, panelWidth, panelHeight, 8);
+  pop();
+
+  // Title
+  push();
+  fill(...CURRENT_THEME.colors.cyan);
+  textAlign(CENTER, TOP);
+  textSize(titleSize);
+  text("⚙️ SETTINGS", VIEW_PIXELS / 2, panelY + pad);
+  pop();
+
+  // UI sections
+  const section1Y = panelY + titleSize * 2 + pad;
+  drawDpadToggle(panelX, section1Y, panelWidth, sectionHeight, fontSize);
+
+  const section2Y = section1Y + sectionHeight + pad;
+  drawAudioToggle(panelX, section2Y, panelWidth, sectionHeight, fontSize);
+
+  const buttonY = panelY + panelHeight - buttonHeight - pad;
+  drawResumeButton(panelX, buttonY, panelWidth, buttonHeight, fontSize);
+}
+
+function drawDpadToggle(x, y, w, h, fontSize) {
+  push();
+
+  fill(...CURRENT_THEME.colors.cyan);
+  textAlign(LEFT, TOP);
+  textSize(fontSize * 1.1);
+  text("D-PAD VISIBILITY", x + max(TILE_SIZE * 0.4, 8), y);
+
+  const checkboxSize = max(fontSize * 1.8, 30);
+  const checkboxX = x + max(TILE_SIZE * 0.4, 8);
+  const checkboxY = y + fontSize * 1.8;
+
+  settingsElements.dpadCheckbox = { x: checkboxX, y: checkboxY, size: checkboxSize };
+
+  stroke(...CURRENT_THEME.colors.cyan);
+  strokeWeight(2);
+  fill(...CURRENT_THEME.colors.deepPurple);
+  rect(checkboxX, checkboxY, checkboxSize, checkboxSize, 3);
+
+  if (uiSettings.dpadVisible) {
+    fill(...CURRENT_THEME.colors.pink);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(checkboxSize * 0.8);
+    text("✓", checkboxX + checkboxSize/2, checkboxY + checkboxSize/2);
+  }
+
+  fill(...CURRENT_THEME.colors.cyan);
+  textAlign(LEFT, CENTER);
+  textSize(fontSize);
+  text("Show D-Pad", checkboxX + checkboxSize + 12, checkboxY + checkboxSize/2);
+
+  const statusText = uiSettings.autoDetected ?
+    `Auto-detected: ${uiSettings.deviceType}` : "Manual override";
+  fill(...CURRENT_THEME.colors.cyan, 150);
+  textSize(fontSize * 0.8);
+  textAlign(LEFT, TOP);
+  text(statusText, checkboxX, checkboxY + checkboxSize + 8);
+
+  pop();
+}
+
+function drawAudioToggle(x, y, w, h, fontSize) {
+  push();
+
+  fill(...CURRENT_THEME.colors.cyan);
+  textAlign(LEFT, TOP);
+  textSize(fontSize * 1.1);
+  text("AUDIO", x + max(TILE_SIZE * 0.4, 8), y);
+
+  const iconSize = max(fontSize * 2, 32);
+  const iconX = x + max(TILE_SIZE * 0.4, 8) + iconSize / 2;
+  const iconY = y + fontSize * 2 + iconSize / 2;
+
+  settingsElements.muteButton = { x: iconX, y: iconY, radius: iconSize };
+
+  fill(...CURRENT_THEME.colors.pink, audioManager.muted ? 100 : 255);
+  textAlign(CENTER, CENTER);
+  textSize(iconSize);
+  text(audioManager.muted ? "🔇" : "🔊", iconX, iconY);
+
+  fill(...CURRENT_THEME.colors.cyan);
+  textAlign(LEFT, CENTER);
+  textSize(fontSize);
+  text("Mute All Sound", iconX + iconSize, iconY);
+
+  pop();
+}
+
+function drawResumeButton(x, y, w, h, fontSize) {
+  push();
+
+  settingsElements.resumeButton = { x: x, y: y, w: w, h: h };
+
+  fill(...CURRENT_THEME.colors.purple, 180);
+  rect(x, y, w, h, 6);
+
+  let pulse = sin(frameCount * 0.1) * 0.3 + 0.7;
+  noFill();
+  stroke(...CURRENT_THEME.colors.pink, 255 * pulse);
+  strokeWeight(2);
+  rect(x, y, w, h, 6);
+
+  fill(...CURRENT_THEME.colors.cyan);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(fontSize * 1.3);
+  text("RESUME GAME", x + w/2, y + h/2);
+
+  pop();
+}
+
+function handleSettingsClick() {
+  // D-pad checkbox
+  const cb = settingsElements.dpadCheckbox;
+  if (mouseX >= cb.x && mouseX <= cb.x + cb.size &&
+      mouseY >= cb.y && mouseY <= cb.y + cb.size) {
+    uiSettings.dpadVisible = !uiSettings.dpadVisible;
+    uiSettings.autoDetected = false; // Manual override
+    return false;
+  }
+
+  // Mute button
+  const mb = settingsElements.muteButton;
+  if (dist(mouseX, mouseY, mb.x, mb.y) < mb.radius) {
+    const wasMuted = audioManager.toggleMute();
+    if (!wasMuted && gameState === "playing") {
+      audioManager.startMusic(CURRENT_THEME.name);
+    }
+    return false;
+  }
+
+  // Resume button
+  const rb = settingsElements.resumeButton;
+  if (mouseX >= rb.x && mouseX <= rb.x + rb.w &&
+      mouseY >= rb.y && mouseY <= rb.y + rb.h) {
+    gameState = "playing";
+    return false;
+  }
+
+  return false;
 }
 
 /*  SIZE & DPAD CALCULATION  */

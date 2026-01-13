@@ -65,6 +65,16 @@ Each theme is a JavaScript object implementing these required methods:
 WORLD_SIZE = 128          // Total world tiles (128×128)
 FIXED_VIEW_TILES = 32     // Visible viewport (32×32)
 BIOMES = { NEON_CITY, LAVA_FIELDS, CRYSTAL_GARDEN, VOID, SAFE_ZONE }
+
+// Game states
+gameState = "start" | "playing" | "settings"
+
+// UI Settings (device detection and D-pad visibility)
+uiSettings = {
+  dpadVisible: true/false,     // Whether D-pad is shown
+  autoDetected: true/false,    // Auto-detection or manual override
+  deviceType: 'mobile'/'desktop'/'unknown'
+}
 ```
 
 ## Adding a New Theme
@@ -82,9 +92,34 @@ BIOMES = { NEON_CITY, LAVA_FIELDS, CRYSTAL_GARDEN, VOID, SAFE_ZONE }
 ## Mobile Support
 
 - **Responsive canvas:** Automatically scales to screen size while maintaining square aspect ratio
-- **Touch controls:** D-pad in bottom-right corner (see `drawControls()` in each theme)
+- **Device Detection:** Multi-factor detection (touch capability + user agent + screen size) auto-shows/hides D-pad
+- **Touch controls:** D-pad in bottom-right corner (see `drawControls()` in each theme), auto-visible on mobile
+- **Settings screen:** Gear icon (⚙️) in HUD opens settings to toggle D-pad visibility and mute audio
 - **Theme selection:** Arrow buttons (◀ ▶) on start screen, implemented in `handleStartScreenTouch()`
 - **CSS:** `touch-action: none`, `user-select: none`, `overscroll-behavior: none` prevent mobile browser interference
+
+## Settings Screen
+
+Accessible via gear icon (⚙️) in HUD center-top or ESC key. Pauses all game logic while open.
+
+**Features:**
+- **D-pad Visibility Toggle:** Checkbox to show/hide D-pad, with auto-detection status display
+- **Audio Controls:** Mute/unmute all sound (moved from HUD for cleaner interface)
+- **Device Detection:** `detectDevice()` runs on startup using multi-factor detection:
+  - Touch capability check
+  - User agent pattern matching
+  - Screen size threshold (< 768px)
+  - Considers mobile if ANY two factors are true
+- **Game Pause:** Freezes `updateExplosions()`, `updateMovingHazards()`, and `checkHazards()` while settings open
+- **Theme-aware UI:** Settings panel adapts colors from current theme (Vaporwave, Pixel Art, ASCII)
+
+**Functions:**
+- `drawSettingsScreen()` - Main settings panel overlay
+- `drawDpadToggle()` - D-pad visibility checkbox with status text
+- `drawAudioToggle()` - Mute icon and label
+- `drawResumeButton()` - Pulsing button to return to game
+- `handleSettingsClick()` - Hit-testing for settings interactions
+- `detectDevice()` - Multi-factor device type detection
 
 ## Testing Strategy
 
